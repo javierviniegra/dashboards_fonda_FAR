@@ -13,18 +13,21 @@ Selections are cut from the read with Central's comparable-branches rule
 consolidated or a single branch.
 """
 
+import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from django.core.cache import cache
 from django.utils import timezone
 
 from central.motor import metricas
-from central.motor.fuentes import conexiones
+from central.motor.fuentes import conexiones, odoo
 from central.motor.periodo import Periodo, TipoPeriodo
 
 from . import motor_central
 from .models import Sucursal
+
+log = logging.getLogger(__name__)
 
 # v1 periods (owner, 2026-11-17): week and month, closed ones only -- an open
 # period counts days not yet lived as expected and would always read "s/cf".
@@ -81,7 +84,18 @@ def _clave(periodo: Periodo, sucursales: list[Sucursal], costos: bool) -> str:
             f":{int(costos)}:{ids}")
 
 
-def leer(periodo: Periodo, costos: bool = False, refrescar: bool = False,
+def _abrir_odoo():
+    """Read-only Odoo client for the invoiced sales behind the estimated
+    cost, or None when Odoo cannot be reached (the costs then come out
+    flagged by Central's engine), as Central's commercial report does."""
+    try:
+        return odoo.abrir_odoo()
+    except Exception:
+        log.exception("Odoo no disponible para el costo estimado")
+        return None
+
+
+def leer(periodo: Periodo, costos: bool = True, refrescar: bool = False,
          duracion: int | None = None) -> Lectura:
     """Every active branch's metrics for `periodo` and its comparisons, from
     the cache when read in the last hour (unless `refrescar`). `duracion`
@@ -94,9 +108,10 @@ def leer(periodo: Periodo, costos: bool = False, refrescar: bool = False,
             return guardada
     anterior = periodo.anterior()
     anio_ant = periodo.mismo_periodo_anio_anterior()
+    cli = _abrir_odoo() if costos and any(s.odoo_company_id for s in sucursales) else None
     with conexiones.abrir_wansoft() as cw, conexiones.abrir_presupuestos() as cp:
         def una(p):
-            return metricas.recolectar(cw, cp, sucursales, p, incluir_costos=costos)
+            return metricas.recolectar(cw, cp, sucursales, p, odoo=cli, incluir_costos=costos)
         actual, previo = una(periodo), una(anterior)
         anio = None if anio_ant is None else (previo if anio_ant == anterior else una(anio_ant))
     lectura = Lectura(sucursales, periodo, anterior, anio_ant, actual, previo, anio,
@@ -139,6 +154,9 @@ class Seleccion:
     actual: metricas.Metricas
     contra_anterior: metricas.Comparacion
     contra_anio: metricas.Comparacion
+    con_costo: bool = True  # False: a single branch whose cost is not considered (Metepec)
+    sin_costo: tuple[str, ...] = ()  # consolidated: branches whose cost is not considered
+    facturado_incompleto: bool = False  # consolidated: invoiced cost dropped (some branches lack it)
 
 
 def seleccionar(lectura: Lectura, clave: str | None) -> Seleccion:
@@ -154,9 +172,27 @@ def seleccionar(lectura: Lectura, clave: str | None) -> Seleccion:
     act = [lectura.actual[i] for i in indices]
     prev = [lectura.previo[i] for i in indices]
     anio = [lectura.anio[i] for i in indices] if lectura.anio is not None else None
-    return Seleccion(
+    sel = Seleccion(
         nombre,
         metricas.consolidar(act, lectura.periodo),
         metricas.comparables(nombres, act, prev, lectura.periodo, lectura.anterior),
         metricas.comparables(nombres, act, anio, lectura.periodo, lectura.anio_anterior),
     )
+    if clave is not None:
+        sel.con_costo = lectura.sucursales[indices[0]].considerar_costo
+        return sel
+    sel.sin_costo = tuple(lectura.sucursales[i].nombre for i in indices
+                          if not lectura.sucursales[i].considerar_costo)
+    # Central's consolidated rule (owner, 2026-10-05): a budget or an invoiced
+    # cost is shown only when every branch has it, each period on its own; a
+    # partial one would stain the whole figure.
+    for m in (sel.actual, sel.contra_anterior.actual, sel.contra_anterior.base,
+              sel.contra_anio.actual, sel.contra_anio.base):
+        if m is None:
+            continue
+        if 0 < m.n_con_presupuesto < m.n_sucursales:
+            metricas.sin_presupuesto(m)
+        if 0 < m.n_con_costo_ventas < m.n_sucursales:
+            metricas.sin_costo_facturado(m)
+            sel.facturado_incompleto = True
+    return sel

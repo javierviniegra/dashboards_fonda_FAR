@@ -137,6 +137,11 @@ def _m(periodo, venta, dias):
                     dias_con_cierre=dias, dias_con_detalle=dias)
 
 
+def _venta(sel, clave="venta_bruta"):
+    """One card of the Dirección General tab."""
+    return {t.indicador.clave: t for t in indicadores.tarjetas(sel, "portada")}[clave]
+
+
 class SeleccionTests(TestCase):
     def setUp(self):
         self.p = Periodo.semana_de(date(2026, 11, 11))
@@ -152,27 +157,27 @@ class SeleccionTests(TestCase):
 
     def test_consolidated_compares_comparable_branches_only(self):
         sel = lectura.seleccionar(self.lec, None)
-        (t,) = indicadores.tarjetas(sel, "portada")
+        t = _venta(sel)
         self.assertEqual(t.valor, Decimal(1500))            # every branch
         self.assertEqual(t.valor_comparable_anio, Decimal(1000))  # A only
         self.assertEqual(t.anio_anterior, Decimal(800))
         self.assertEqual(t.var_anio.porcentaje, Decimal("0.25"))
-        self.assertEqual(t.excluidas_anio, ["B (nueva)"])
+        self.assertEqual(t.excluidas_anio, ("B (nueva)",))
         self.assertEqual(t.valor_texto, "$1,500.00")
         self.assertEqual(t.var_anio_texto, "▲ +25.0%")
 
     def test_single_branch(self):
-        (t,) = indicadores.tarjetas(lectura.seleccionar(self.lec, "a"), "portada")
-        self.assertEqual((t.valor, t.anterior, t.excluidas_anio), (Decimal(1000), Decimal(900), []))
+        t = _venta(lectura.seleccionar(self.lec, "a"))
+        self.assertEqual((t.valor, t.anterior, t.excluidas_anio), (Decimal(1000), Decimal(900), ()))
 
     def test_light_consolidated_against_last_year_plus_5(self):
-        (t,) = indicadores.tarjetas(lectura.seleccionar(self.lec, None), "portada")
+        t = _venta(lectura.seleccionar(self.lec, None))
         self.assertEqual(t.meta, Decimal(840))                      # A's 800 x 1.05
         self.assertEqual((t.semaforo, t.meta_base_texto), ("verde", "año anterior +5%"))
         self.assertEqual(t.logro_texto, "119.0%")                   # 1000 / 840
 
     def test_light_new_branch_against_previous_period(self):
-        (t,) = indicadores.tarjetas(lectura.seleccionar(self.lec, "b"), "portada")
+        t = _venta(lectura.seleccionar(self.lec, "b"))
         self.assertEqual(t.meta, Decimal(420))                      # 400 x 1.05
         self.assertIn("periodo anterior", t.meta_base_texto)
 
@@ -181,7 +186,7 @@ class SeleccionTests(TestCase):
         lec = lectura.Lectura([a], self.p, self.ant, self.anio, [_m(self.p, actual, 7)],
                               [_m(self.ant, 900, dias_ant)], [_m(self.anio, anio, dias_anio)],
                               datetime(2026, 11, 18, tzinfo=dt_tz.utc), "prod")
-        return indicadores.tarjetas(lectura.seleccionar(lec, "a"), "portada")[0]
+        return _venta(lectura.seleccionar(lec, "a"))
 
     def test_light_orange_and_red(self):
         self.assertEqual(self._una(1000, 1000).semaforo, "naranja")  # 95.2% of 1050
@@ -198,6 +203,59 @@ class SeleccionTests(TestCase):
         t = self._una(1000, 1000, dias_anio=5, dias_ant=5)
         self.assertIsNone(t.semaforo)
         self.assertIsNone(t.meta)
+
+    def test_every_ready_card_has_a_central_row_and_pending_ones_say_why(self):
+        from central.motor import tabla_comercial
+        filas = {i.clave for i in tabla_comercial.INDICADORES}
+        for ind in indicadores.CATALOGO:
+            if ind.estado == indicadores.LISTO:
+                self.assertIn(ind.fila_comercial, filas, ind.clave)
+            else:
+                self.assertTrue(ind.pendiente, ind.clave)
+
+    def test_portada_cards_in_order(self):
+        claves = [t.indicador.clave for t in indicadores.tarjetas(lectura.seleccionar(self.lec, None), "portada")]
+        self.assertEqual(claves, ["venta_bruta", "venta_neta", "clientes", "afluencia_salon", "cheque_promedio",
+                                  "ticket_promedio", "mix_bebidas", "costo_total_pct", "costo_ventas_pct", "ebitda"])
+
+    def test_pending_cards_are_grey(self):
+        sel = lectura.seleccionar(self.lec, None)
+        for clave in ("afluencia_salon", "ebitda"):
+            self.assertFalse(_venta(sel, clave).mostrar)
+
+    def test_net_sales_has_no_light(self):
+        self.assertIsNone(_venta(lectura.seleccionar(self.lec, None), "venta_neta").semaforo)
+
+    def test_cost_band_light(self):
+        m = _m(self.p, 1000, 7)
+        m.costo_total, m.venta_neta_con_costo_total = Decimal(380), Decimal(1000)   # 38%: green
+        lec = lectura.Lectura([self.a], self.p, self.ant, self.anio, [m], [_m(self.ant, 900, 7)],
+                              [_m(self.anio, 800, 7)], datetime(2026, 11, 18, tzinfo=dt_tz.utc), "prod")
+        t = _venta(lectura.seleccionar(lec, "a"), "costo_total_pct")
+        self.assertEqual((t.valor, t.semaforo), (Decimal("0.38"), "verde"))
+        self.assertEqual(t.meta_corta, "meta: de 37% a menos de 39%")
+        m.costo_total = Decimal(360)                                               # 36%: orange
+        self.assertEqual(_venta(lectura.seleccionar(lec, "a"), "costo_total_pct").semaforo, "naranja")
+        m.costo_total = Decimal(395)                                               # 39.5%: red
+        self.assertEqual(_venta(lectura.seleccionar(lec, "a"), "costo_total_pct").semaforo, "rojo")
+
+    def test_cost_not_considered_branch(self):
+        self.a.considerar_costo = False
+        t = _venta(lectura.seleccionar(self.lec, "a"), "costo_total_pct")
+        self.assertFalse(t.mostrar)
+        self.assertIn("No se considera el costo", t.aviso)
+        self.assertEqual(lectura.seleccionar(self.lec, None).sin_costo, ("A",))
+
+    def test_partial_invoiced_cost_dropped_in_consolidated(self):
+        self.lec.actual[0].costo_ventas_real = Decimal(300)
+        self.lec.actual[0].venta_neta_con_costo = Decimal(1000)
+        self.lec.actual[0].n_con_costo_ventas = 1                   # A has it, B does not
+        sel = lectura.seleccionar(self.lec, None)
+        self.assertTrue(sel.facturado_incompleto)
+        t = _venta(sel, "costo_ventas_pct")
+        self.assertFalse(t.mostrar)
+        self.assertIn("no todas las sucursales", t.aviso)
+        self.assertFalse(lectura.seleccionar(self.lec, "a").facturado_incompleto)
 
     def test_unknown_branch(self):
         with self.assertRaises(KeyError):

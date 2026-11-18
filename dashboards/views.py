@@ -71,6 +71,10 @@ def tablero(request, pestana):
                 "origen": lec.origen,
                 "anio_anterior": lec.anio_anterior,
                 "anterior": lec.anterior,
+                "excluidas_anio": sel.contra_anio.excluidas,
+                "anio_sin_base": bool(sel.contra_anio.excluidas) and sel.contra_anio.base is None,
+                "sin_costo": sel.sin_costo,
+                "facturado_incompleto": sel.facturado_incompleto,
             })
         except Exception:  # sources unreachable: say so, never a 500 in the meeting
             log.exception("No se pudieron leer las fuentes")

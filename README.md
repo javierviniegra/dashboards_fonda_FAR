@@ -11,7 +11,8 @@ Web "super dashboard" for the Dirección General of Grupo Fonda Argentina (Djang
 |---|---|---|
 | 0 | Skeleton: Django project, login, brand template, four tabs (Dirección General, Ranking, Comercial, Operaciones), help page, Central's engine as a pinned submodule, smoke tests | **Done** (commit 1a1d456) |
 | 1 | One indicator end to end (gross sales with VAT vs last year): branch catalog from Central's list, closed week / month picker, 1-hour cached reading of every branch, card on the Dirección General tab, help per indicator; cross-checked to the cent against Central's commercial report | **Done in dev** (awaiting the owner's approval) |
-| 2-5 | Dirección General overview, Comercial (block 3), Operaciones (block 4), Ranking (block 2) | Pending |
+| 2 | Dirección General overview: ten cards (sales, guests, check, ticket, drinks mix, both costs with Central's lights; dining-room guests and EBITDA grey as pending); cache warm-up task | **Done in dev** |
+| 3-5 | Comercial (block 3), Operaciones (block 4), Ranking (block 2: waits for Central to publish its scorecard reading) | Pending |
 
 ## How the numbers are computed
 

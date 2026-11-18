@@ -88,3 +88,9 @@ h2 { color: var(--verde-oscuro); font-size: 18px; margin: 24px 0 8px; }
 .luz-naranja { background: var(--naranja); }
 .luz-rojo { background: #b3261e; }
 .kpi-meta { font-size: 13px; font-weight: 600; color: var(--verde-oscuro); margin-bottom: 6px; }
+
+/* Page notes and grey (pending) cards (Dirección General overview). */
+.nota-pagina { font-size: 13px; color: #7a5a00; background: #fff6dc; border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; line-height: 1.45; }
+.kpi-gris { border-top-color: #bbb; background: #f4f3ef; box-shadow: none; }
+.kpi-gris .kpi-valor { color: #999; }
+.kpi-nota-gris { font-size: 12px; color: var(--tenue); line-height: 1.4; }

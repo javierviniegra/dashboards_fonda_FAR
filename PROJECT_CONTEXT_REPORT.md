@@ -75,6 +75,9 @@ Known engine facts for block 1: the engine expects branch objects with `nombre`,
 
 # 7. Next steps
 
+**Blocker found 2026-11-18:** Central's scorecard reading (`reporte_scorecard.py`, dining-room guests, the Ranking block's KPIs) is only in Central's LOCAL repo (commits `c6bb993`, `cd6bdaa`; local `main` ahead 3 / behind 4 of `origin/main`). Not pinnable until Central's own session merges and pushes it. Then: move `vendor/central`, run the guard test, turn on "Afluencia de salón", start Ranking.
+
+
 1. Owner reviews block 1 → commit. Sales light settled: scorecard (last year +5%). Cache warm-up built (`precalentar`, dev task "Dashboards Fonda - Precalentar" registered 2026-11-18). Open: `docs/reference/` in the repo or not.
 2. Then blocks: Dirección General overview, Comercial, Operaciones, Ranking.
 

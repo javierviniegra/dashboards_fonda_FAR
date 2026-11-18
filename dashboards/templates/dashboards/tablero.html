@@ -31,35 +31,46 @@
   <p class="muted">Wansoft o Presupuestos AP no respondieron. Intenta de nuevo en unos minutos; si sigue, avisa a Sistemas.</p>
 </div>
 {% else %}
+{% if excluidas_anio and not anio_sin_base %}
+<p class="nota-pagina">
+  Las comparaciones contra {{ anio_anterior.etiqueta }} son solo sobre las sucursales comparables. Quedan fuera
+  por no tener completo ese periodo: {{ excluidas_anio|join:", " }}.
+</p>
+{% elif anio_sin_base %}
+<p class="nota-pagina">Sin el periodo del año anterior completo: no hay comparación anual.</p>
+{% endif %}
+{% if sin_costo %}<p class="nota-pagina">No se considera el costo de {{ sin_costo|join:", " }} (así está configurada la sucursal).</p>{% endif %}
+
 <section class="tarjetas">
   {% for t in tarjetas %}
+  {% if t.mostrar %}
   <article class="kpi">
-    <span class="kpi-titulo">{{ t.indicador.etiqueta }}</span>
+    <span class="kpi-titulo">{{ t.indicador.etiqueta }}{% if t.estimado %} · estimado{% endif %}{% if t.preliminar %} · preliminar{% endif %}</span>
     <div class="kpi-valor">{% if t.semaforo %}<span class="luz luz-{{ t.semaforo }}" title="Semáforo: {{ t.semaforo }}"></span>{% endif %}{{ t.valor_texto }}</div>
-    {% if t.semaforo %}
-    <div class="kpi-meta">
-      {{ t.logro_texto }} de la meta ({{ t.meta_texto }}, {{ t.meta_base_texto }})
-    </div>
-    {% elif t.indicador.regla_semaforo %}
-    <div class="kpi-meta muted">Sin semáforo: no hay meta fiable para este periodo.</div>
+    {% if t.semaforo and t.logro_texto %}
+    <div class="kpi-meta">{{ t.logro_texto }} de la meta ({{ t.meta_texto }}, {{ t.meta_base_texto }})</div>
+    {% elif t.semaforo %}
+    <div class="kpi-meta">{{ t.meta_corta }}</div>
+    {% elif t.indicador.luz %}
+    <div class="kpi-meta muted">Sin semáforo: no hay dato o meta fiable para este periodo.</div>
     {% endif %}
     <div class="kpi-comp">
       <span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span>
       vs {{ anio_anterior.etiqueta|default:"año anterior" }}: {{ t.anio_texto }}
+      {% if excluidas_anio and t.anio_anterior is not None %}<span class="muted"> (comparables: {{ t.comparable_texto }})</span>{% endif %}
     </div>
-    {% if t.excluidas_anio and t.anio_anterior is None %}
-    <div class="kpi-nota">Sin el periodo del año anterior completo: no hay comparación anual.</div>
-    {% elif t.excluidas_anio %}
-    <div class="kpi-nota">
-      Comparación sobre las sucursales comparables ({{ t.comparable_texto }} este periodo). Fuera por no tener
-      el periodo del año anterior completo: {{ t.excluidas_anio|join:", " }}.
-    </div>
-    {% endif %}
     <div class="kpi-comp secundaria">
       <span class="var var-{{ t.var_anterior.color }}">{{ t.var_anterior_texto }}</span>
       vs {{ anterior.etiqueta }}: {{ t.anterior_texto }}
     </div>
   </article>
+  {% else %}
+  <article class="kpi kpi-gris">
+    <span class="kpi-titulo">{{ t.indicador.etiqueta }}</span>
+    <div class="kpi-valor">—</div>
+    <div class="kpi-nota-gris">{% if t.aviso %}{{ t.aviso }}{% else %}{{ t.indicador.pendiente }}{% endif %}</div>
+  </article>
+  {% endif %}
   {% endfor %}
 </section>
 <p class="leido muted">

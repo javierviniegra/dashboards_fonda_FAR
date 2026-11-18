@@ -2,6 +2,17 @@
 
 Newest first. Each entry: what, why, and where it applies.
 
+## 2026-11-18 — Dirección General overview: ten cards (owner)
+
+- **Cards (owner, 2026-11-18): the ones proposed plus the draft's top cards.** In order: gross sales, net sales, guests, dining-room guests, average check, average ticket, drinks mix, total cost / net sales, invoiced cost / net sales, EBITDA. Every ready card is a row of Central's commercial table (`venta_bruta`, `venta_neta`, `clientes`, `cheque_promedio`, `ticket_promedio`, `mix_bebidas`, `costo_total_pct`, `costo_ventas_pct`) with its value, comparisons and light.
+- **Lights:** sales, guests, check and ticket = scorecard (last year +5%); drinks mix = scorecard fixed threshold (green from 30%, orange from 26%; the draft's 28% target is not used); **both costs = the commercial report's band (owner): green 37% to below 39% of net sales, orange below 37%, red from 39%** (`comparativos.kpi_costo`). Net sales: no light (no sales budget anywhere). Rule texts built from Central's constants.
+- **"Afluencia Total Salón" (draft) = dining-room guests only (owner), as the scorecard counts them, as a card separate from "Clientes"** (all orders). **Shown grey as pending:** that count lives in Central's scorecard reading (`reporte_scorecard.py`, commits `c6bb993` / `cd6bdaa`), which exists only in Central's local working copy -- it is not on GitHub, so it cannot be pinned (production clones from GitHub). Central's local `main` is also diverged from `origin/main` (ahead 3, behind 4). When Central publishes it, move the submodule and turn the card on. The Ranking block (scorecard) waits for the same.
+- **"Costo Insumos (COGS)" (draft) = both of Central's costs (owner):** total cost (Wansoft/Odoo cost report, "estimado" while Odoo invoicing lags) and invoiced cost (Presupuestos AP, "preliminar" until 10 days after the month closes). Same consolidated rule as Central: a budget or invoiced cost appears only when every branch has it in that period (`metricas.sin_presupuesto` / `sin_costo_facturado`); the page says when it was dropped. Metepec (`considerar_costo=False`): its own cost cards say "No se considera el costo de esta sucursal"; the consolidated says it is left out.
+- **EBITDA: grey "pendiente de fuente"** (to build from Odoo accounting).
+- **The reading now includes costs and Odoo** (`metricas.recolectar(..., odoo=client, incluir_costos=True)`, Odoo opened as Central does; unreachable Odoo degrades, never fails). Week 46 read in 44 s.
+- **Cross-check, week 46 2026 (consolidated, Acoxpa, Metepec):** every value, comparison and light identical to Central's `probar_reporte` (run from Central's local copy). Consolidated total cost 35.4% estimated, orange (LY 38.1%, previous 36.2%); invoiced cost dropped in the consolidated (as Central); Acoxpa invoiced 2.0% preliminary (November invoices still being captured).
+- **Excluded branches:** said once above the cards; each card adds the comparable branches' value next to the last-year figure.
+
 ## 2026-11-18 — Cache warm-up on a schedule (owner)
 
 - **Why:** a fresh read takes minutes (2026-11-18: last closed week 35-93 s, last closed month 174 s), so the first viewer of each hour would wait. Data stays "live + cache"; the cache is just kept warm for the periods the meetings open.

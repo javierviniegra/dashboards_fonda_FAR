@@ -57,7 +57,8 @@
     <h3>{{ i.etiqueta }}</h3>
     <p class="muted"><strong>Qué es:</strong> {{ i.definicion }}</p>
     <p class="muted"><strong>Fuente:</strong> {{ i.fuente }}</p>
-    <p class="muted"><strong>Comparación:</strong> {{ i.regla }}</p>
+    {% if i.pendiente %}<p class="muted"><strong>Estado:</strong> {{ i.pendiente }}</p>{% endif %}
+    {% if i.regla %}<p class="muted"><strong>Comparación:</strong> {{ i.regla }}</p>{% endif %}
     {% if i.regla_semaforo %}<p class="muted"><strong>{{ i.regla_semaforo }}</strong></p>{% endif %}
   {% endfor %}
 </div>
