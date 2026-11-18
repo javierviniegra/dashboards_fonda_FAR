@@ -1,0 +1,3 @@
+[submodule "vendor/central"]
+	path = vendor/central
+	url = https://github.com/javierviniegra/analisis_ejecutivos_FAR.git

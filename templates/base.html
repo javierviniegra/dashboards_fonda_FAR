@@ -1,0 +1,36 @@
+{% load static %}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dashboards Fonda{% endblock %} · Fonda Argentina</title>
+  <link rel="stylesheet" href="{% static 'dashboards/css/tablero.css' %}">
+</head>
+<body>
+<header class="barra">
+  <a class="marca" href="{% url 'home' %}">
+    <img src="{% static 'dashboards/img/logo.png' %}" alt="Fonda Argentina">
+    <span>Dashboards Fonda</span>
+  </a>
+  <nav class="usuario">
+    {% if user.is_authenticated %}
+      <span>{{ user.get_full_name|default:user.username }}</span>
+      <a href="{% url 'ayuda' %}">Ayuda</a>
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administración</a>{% endif %}
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn btn-claro">Salir</button></form>
+    {% endif %}
+  </nav>
+</header>
+{% if pestanas %}
+<nav class="pestanas" aria-label="Pestañas del tablero">
+  {% for slug, etiqueta, _ in pestanas %}
+    <a href="{% url 'tablero' slug %}" class="{% if slug == activa %}activa{% endif %}">{{ etiqueta }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
+<main>{% block content %}{% endblock %}</main>
+<footer class="pie">
+  Grupo Fonda Argentina · Cálculos: motor de Central de Reportes, versión <code>{{ version_motor }}</code>
+</footer>
+</body>
+</html>

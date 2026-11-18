@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }}{% endblock %}
+{% block content %}
+<h1>{{ titulo }}</h1>
+<p class="subtitulo">{{ subtitulo }}</p>
+<div class="card">
+  <span class="badge">En construcción</span>
+  <p class="muted">
+    Esta pestaña todavía no muestra indicadores. Se agregan bloque por bloque, cada uno con su
+    definición acordada y calculado con el motor de Central de Reportes. Ningún número de este
+    tablero se escribe a mano.
+  </p>
+</div>
+{% endblock %}

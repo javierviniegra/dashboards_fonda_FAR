@@ -1,0 +1,25 @@
+# Security and environment
+.env
+
+# Django
+db.sqlite3
+staticfiles/
+media/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDEs
+.idea/
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# Owner's reference material (the draft carries figures that look real:
+# banks, suppliers, EBITDA per branch) -- kept local until the owner decides.
+docs/reference/

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Ayuda{% endblock %}
+{% block content %}
+<h1>Ayuda</h1>
+<p class="subtitulo">Cómo usar Dashboards Fonda</p>
+
+<div class="card">
+  <h2>¿Qué es?</h2>
+  <p class="muted">
+    Dashboards Fonda es el tablero de la Dirección General de Grupo Fonda Argentina. Reúne en una
+    sola pantalla los indicadores de la red y de cada sucursal para las juntas semanales y mensuales.
+  </p>
+
+  <h2>Pestañas</h2>
+  <ul class="muted">
+    {% for slug, etiqueta, descripcion in pestanas %}
+      <li><a href="{% url 'tablero' slug %}">{{ etiqueta }}</a>: {{ descripcion }}.</li>
+    {% endfor %}
+  </ul>
+
+  <h2>¿De dónde salen los números?</h2>
+  <p class="muted">
+    Se leen en el momento de las fuentes oficiales (Wansoft, Odoo y Presupuestos AP), siempre en
+    solo lectura, con las mismas reglas de cálculo que los reportes de Central de Reportes. El pie de
+    cada página muestra la versión del motor de cálculo con la que se obtuvieron.
+  </p>
+
+  <h2>Estado</h2>
+  <p class="muted">
+    Versión inicial: las pestañas existen pero todavía no tienen indicadores. Esta ayuda se amplía con
+    cada indicador que se agregue (definición, fuente y regla de semáforo).
+  </p>
+</div>
+{% endblock %}

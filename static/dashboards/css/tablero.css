@@ -1,0 +1,64 @@
+/* Dashboards Fonda: brand palette (same as Central de Reportes and Presupuestos AP). */
+:root {
+  --verde: #035953;
+  --verde-oscuro: #023f3b;
+  --naranja: #eb6834;
+  --crema: #f0e9d8;
+  --fondo: #f6f4ee;
+  --texto: #2d2d2d;
+  --tenue: #666;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--texto); background: var(--fondo);
+}
+a { color: var(--verde); }
+
+.barra {
+  background: var(--verde-oscuro); color: var(--crema);
+  padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.marca { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: .02em; color: var(--crema); text-decoration: none; }
+.marca img { height: 34px; width: auto; }
+.usuario { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+.usuario a { color: #fff; text-decoration: none; }
+.usuario a:hover { text-decoration: underline; }
+.usuario form { display: inline; margin: 0; }
+
+.pestanas {
+  background: var(--verde); padding: 0 24px; display: flex; gap: 4px; overflow-x: auto;
+}
+.pestanas a {
+  color: var(--crema); text-decoration: none; font-size: 14px; font-weight: 600;
+  padding: 12px 16px; border-bottom: 3px solid transparent; white-space: nowrap;
+}
+.pestanas a:hover { background: rgba(255, 255, 255, .08); }
+.pestanas a.activa { color: #fff; border-bottom-color: var(--naranja); }
+
+main { flex: 1; width: 100%; max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+h1 { color: var(--verde-oscuro); font-size: 24px; margin: 0 0 4px; }
+h2 { color: var(--verde-oscuro); font-size: 18px; margin: 24px 0 8px; }
+.subtitulo { color: var(--tenue); margin: 0 0 20px; }
+
+.card { background: #fff; border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, .08); padding: 24px 28px; margin-bottom: 18px; }
+.badge {
+  display: inline-block; background: var(--crema); color: var(--verde-oscuro);
+  font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 5px 12px; border-radius: 999px;
+}
+.btn { background: var(--verde); color: #fff; border: 0; font-weight: 600; font-size: 14px; padding: 8px 16px; border-radius: 10px; cursor: pointer; text-decoration: none; }
+.btn:hover { background: #04746c; }
+.btn-claro { background: var(--crema); color: var(--verde-oscuro); }
+.btn-claro:hover { background: #fff; }
+.muted { color: var(--tenue); font-size: 14px; line-height: 1.5; }
+
+.pie { text-align: center; color: var(--tenue); font-size: 12px; padding: 16px; }
+.pie code { background: var(--crema); padding: 1px 6px; border-radius: 6px; }
+
+@media (max-width: 600px) {
+  .barra { padding: 10px 16px; }
+  .pestanas { padding: 0 8px; }
+  .card { padding: 18px 16px; }
+}
