@@ -250,3 +250,37 @@ class PortadaTests(TestCase):
 
     def test_help_lists_indicators(self):
         self.assertContains(self.client.get(reverse("ayuda")), indicadores.CATALOGO[0].definicion[:40])
+
+
+class PrecalentarTests(TestCase):
+    def test_periods_are_last_closed_week_and_month(self):
+        ps = lectura.periodos_a_precalentar(date(2026, 11, 18))
+        self.assertEqual([(p.tipo, p.desde) for p in ps],
+                         [(TipoPeriodo.SEMANA, date(2026, 11, 9)), (TipoPeriodo.MES, date(2026, 10, 1))])
+
+    def test_reads_afresh_with_longer_life(self):
+        with mock.patch.object(lectura, "leer") as leer:
+            lectura.precalentar(date(2026, 11, 18))
+        self.assertEqual(leer.call_count, 2)
+        for llamada in leer.call_args_list:
+            self.assertTrue(llamada.kwargs["refrescar"])
+            self.assertEqual(llamada.kwargs["duracion"], lectura.DURACION_PRECALENTADO)
+        self.assertGreater(lectura.DURACION_PRECALENTADO, 60 * 60)  # outlives the hourly schedule
+
+    def test_command_fails_loudly(self):
+        from django.core.management.base import CommandError
+        with mock.patch.object(lectura, "precalentar", side_effect=OSError("down")):
+            with self.assertRaises(CommandError):
+                call_command("precalentar", stdout=mock.MagicMock())
+
+    def test_warm_entry_is_served_from_cache(self):
+        Sucursal.objects.create(clave="a", nombre="A", wansoft_subsidiary_id=1)
+        p = Periodo.semana_de(date(2026, 11, 11))
+        with mock.patch.object(lectura.metricas, "recolectar",
+                               side_effect=lambda cw, cp, s, per, **kw: [_m(per, 100, per.dias)]) as rec, \
+             mock.patch.object(lectura.conexiones, "abrir_wansoft"), \
+             mock.patch.object(lectura.conexiones, "abrir_presupuestos"):
+            lectura.leer(p, refrescar=True, duracion=lectura.DURACION_PRECALENTADO)
+            n = rec.call_count
+            lectura.leer(p)                       # a viewer: no new read
+            self.assertEqual(rec.call_count, n)

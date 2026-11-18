@@ -22,7 +22,9 @@ Web "super dashboard" for the Dirección General of Grupo Fonda Argentina (Djang
 - Updating the engine is deliberate: move the submodule to another commit, run the tests, record it in `docs/DECISIONS.md`.
 - Settings append `vendor/central` to `sys.path` (never prepend: Central also has a `config` package, and ours must win; a test checks it).
 
-Data is read **live, read-only** (Wansoft MySQL, Presupuestos AP, Odoo) and **cached for one hour** per view / branches / period (Django database cache, table `dashboards_cache`).
+Data is read **live, read-only** (Wansoft MySQL, Presupuestos AP, Odoo) and **cached for one hour** per period (Django database cache, table `dashboards_cache`): one read holds every active branch, so the consolidated and each branch come from it.
+
+**Warm-up:** `python manage.py precalentar` reads the last closed week and month ahead; the scheduled task "Dashboards Fonda - Precalentar" runs it daily at 02:30 and hourly 07:00-21:00 (register with `deploy/registrar_tarea_precalentar.ps1`; production adds `-Servidor`, in an administrator PowerShell). Log: `logs/precalentar.log`.
 
 ## Structure
 

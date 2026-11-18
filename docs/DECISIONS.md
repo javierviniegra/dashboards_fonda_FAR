@@ -2,6 +2,12 @@
 
 Newest first. Each entry: what, why, and where it applies.
 
+## 2026-11-18 — Cache warm-up on a schedule (owner)
+
+- **Why:** a fresh read takes minutes (2026-11-18: last closed week 35-93 s, last closed month 174 s), so the first viewer of each hour would wait. Data stays "live + cache"; the cache is just kept warm for the periods the meetings open.
+- **What:** `manage.py precalentar` reads the last closed week and the last closed month afresh (`lectura.precalentar`); those entries live 75 minutes (`DURACION_PRECALENTADO`), longer than the hourly schedule, so the previous entry is still served while the next run reads. Other periods keep the plain one-hour cache and are read on first open. Fails with exit code 1.
+- **Schedule:** Windows task **"Dashboards Fonda - Precalentar"** (`deploy/registrar_tarea_precalentar.ps1`, runs `deploy/precalentar.ps1`): daily 02:30 (after the Wansoft pipeline of 01:30) and hourly 07:00-21:00. Log `logs/precalentar.log` (trimmed to 2000 lines); last run's output in `logs/precalentar_ultima.*.log`. Dev: registered on the owner's PC 2026-11-18 (logon Interactive: only while logged on; needs XAMPP MySQL up, since the cache lives in the app's DB). Production: same script with `-Servidor` (S4U, admin PowerShell) when the app is deployed -- to confirm then.
+
 ## 2026-11-18 — Gross sales light: the scorecard's (owner)
 
 - **What (owner, 2026-11-18):** the gross sales card carries Central's Semáforos scorecard light, the same one Central's commercial report shows: target = the same period last year +5% (`scorecard.CRECIMIENTO_META`); without a comparable last year, the previous period +5%; green from 100% of the target, orange from 90%, red below (`semaforos.PCT_META_VERDE` / `PCT_META_NARANJA`); comparable branches only, no light without a reliable base. The draft's "cumplimiento de presupuesto de ventas" (>=100% / 92-99.9% / <92%) is not used: there is no sales budget in any source.

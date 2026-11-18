@@ -75,7 +75,7 @@ Known engine facts for block 1: the engine expects branch objects with `nombre`,
 
 # 7. Next steps
 
-1. Owner reviews block 1 → commit. Sales light settled: scorecard (last year +5%). Open decisions: warm the cache on a schedule because of the 93 s first read; `docs/reference/` in the repo or not.
+1. Owner reviews block 1 → commit. Sales light settled: scorecard (last year +5%). Cache warm-up built (`precalentar`, dev task "Dashboards Fonda - Precalentar" registered 2026-11-18). Open: `docs/reference/` in the repo or not.
 2. Then blocks: Dirección General overview, Comercial, Operaciones, Ranking.
 
 ---

@@ -81,9 +81,11 @@ def _clave(periodo: Periodo, sucursales: list[Sucursal], costos: bool) -> str:
             f":{int(costos)}:{ids}")
 
 
-def leer(periodo: Periodo, costos: bool = False, refrescar: bool = False) -> Lectura:
+def leer(periodo: Periodo, costos: bool = False, refrescar: bool = False,
+         duracion: int | None = None) -> Lectura:
     """Every active branch's metrics for `periodo` and its comparisons, from
-    the cache when read in the last hour (unless `refrescar`)."""
+    the cache when read in the last hour (unless `refrescar`). `duracion`
+    (seconds) overrides the cache's one hour for this entry (warm-up)."""
     sucursales = list(Sucursal.objects.filter(activa=True).order_by("nombre"))
     clave = _clave(periodo, sucursales, costos)
     if not refrescar:
@@ -99,8 +101,33 @@ def leer(periodo: Periodo, costos: bool = False, refrescar: bool = False) -> Lec
         anio = None if anio_ant is None else (previo if anio_ant == anterior else una(anio_ant))
     lectura = Lectura(sucursales, periodo, anterior, anio_ant, actual, previo, anio,
                       timezone.now(), conexiones.origen())
-    cache.set(clave, lectura)
+    if duracion is None:
+        cache.set(clave, lectura)
+    else:
+        cache.set(clave, lectura, duracion)
     return lectura
+
+
+# Warm-up (owner, 2026-11-18): the periods the meetings open most -- the last
+# closed week and the last closed month -- are read ahead by `manage.py
+# precalentar` on a schedule (hourly), so nobody waits for a fresh read.
+# Those entries live a little longer than the hourly schedule, so the
+# previous one is still there while the next run reads (a run takes minutes).
+DURACION_PRECALENTADO = 75 * 60
+
+
+def periodos_a_precalentar(hoy: date | None = None) -> list[Periodo]:
+    return [periodos_cerrados(t, hoy, 1)[0] for t in TIPOS]
+
+
+def precalentar(hoy: date | None = None) -> list[tuple[Periodo, float]]:
+    """Read every warm-up period afresh into the cache; (period, seconds) each."""
+    salida = []
+    for p in periodos_a_precalentar(hoy):
+        inicio = timezone.now()
+        leer(p, refrescar=True, duracion=DURACION_PRECALENTADO)
+        salida.append((p, (timezone.now() - inicio).total_seconds()))
+    return salida
 
 
 @dataclass
