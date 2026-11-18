@@ -2,6 +2,11 @@
 
 Newest first. Each entry: what, why, and where it applies.
 
+## 2026-11-18 — The engine's files must match the pinned commit (guard test)
+
+- **Found:** after block 1, 91 Python files of `vendor/central` differed on disk from the pinned commit `7181d5d`: reformatted (black style) between 09:02:55 (clone) and 09:06:53. Cause unknown (nothing in this session formats code; no formatter hook in the Claude settings; this project's own files were not touched). Checked by AST: 87 files identical, the other 4 (`detalle.py`, `inflacion.py`, `reporte_cedis.py`, `views.py`, none used here) differ in layout of comments/strings only; every module the dashboards use (`metricas`, `tabla_comercial`, `comparativos`, `formato`, `periodo`, `fuentes`) was AST-identical, so block 1's figures were not affected.
+- **Done:** the submodule restored to the pinned content (`git -C vendor/central checkout -- .`); week 46 re-read with it: same figures to the cent. New `motor_central.cambios_locales()` and a test that fails when any tracked file of the submodule differs from the pinned commit, so it cannot pass unnoticed again.
+
 ## 2026-11-18 — Block 1: branches, periods, cached reading, first indicator
 
 - **Branches** (`dashboards.Sucursal`, same engine-facing fields as Central's `cuentas.Sucursal`) are loaded by `manage.py cargar_sucursales` **from Central's own list**: its `SUCURSALES` and `FORMATOS` constants are read with `ast` from the submodule (the module itself imports Central's `cuentas` app and cannot be imported here). One source for the branch mapping; 19 branches. Metepec gets `considerar_costo=False`, as Central's migration 0004 sets it (owner, 2026-10-05). Perisur and Lindavista are not in Central's list (Oracle Symphony).

@@ -31,6 +31,11 @@ class MotorCentralTests(TestCase):
     def test_version_known(self):
         self.assertRegex(motor_central.version(), r"^[0-9a-f]{7,}$")
 
+    def test_engine_files_match_pinned_commit(self):
+        # 2026-11-18: the submodule's files were once found reformatted on disk
+        # (unknown cause). The numbers must come from the pinned code exactly.
+        self.assertEqual(motor_central.cambios_locales(), [])
+
 
 # Tests run with DEBUG=False; the manifest storage would need collectstatic first.
 @override_settings(STORAGES={

@@ -29,6 +29,16 @@ def version() -> str:
         return "desconocida"
 
 
+def cambios_locales() -> list[str]:
+    """Files of the submodule that differ from the pinned commit (tracked
+    files only; `__pycache__` is untracked and ignored). Must be empty."""
+    out = subprocess.run(
+        ["git", "-C", str(settings.CENTRAL_DIR), "status", "--porcelain", "--untracked-files=no"],
+        capture_output=True, text=True, timeout=30, check=True,
+    )
+    return [linea[3:] for linea in out.stdout.splitlines() if linea.strip()]
+
+
 def disponible() -> bool:
     """True when the engine can be imported from the submodule."""
     try:
