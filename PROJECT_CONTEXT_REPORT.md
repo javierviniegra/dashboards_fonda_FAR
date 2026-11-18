@@ -2,7 +2,7 @@
 
 Master continuity document. Regenerated **in full** (never as patches) at every chat handoff. **Read this first when picking the project up in a fresh chat**, then `README.md` and `docs/DECISIONS.md`.
 
-Last generated: 2026-11-18 (block 1). Repo: `dashboards_fonda_FAR` (local git only; GitHub repo not created yet). Block 0 committed (`1a1d456`); block 1 done in dev, awaiting approval.
+Last generated: 2026-11-18 (block 1). Repo: `dashboards_fonda_FAR` (local git only; GitHub repo not created yet). Blocks 0 and 1 committed (`1a1d456`, `f19e495`, guard `b099055`); sales light in dev.
 
 ---
 
@@ -75,7 +75,7 @@ Known engine facts for block 1: the engine expects branch objects with `nombre`,
 
 # 7. Next steps
 
-1. Owner reviews block 1 → commit. Open decisions: traffic light on sales (scorecard last year +5%, or none); warm the cache on a schedule because of the 93 s first read; `docs/reference/` in the repo or not.
+1. Owner reviews block 1 → commit. Sales light settled: scorecard (last year +5%). Open decisions: warm the cache on a schedule because of the 93 s first read; `docs/reference/` in the repo or not.
 2. Then blocks: Dirección General overview, Comercial, Operaciones, Ranking.
 
 ---

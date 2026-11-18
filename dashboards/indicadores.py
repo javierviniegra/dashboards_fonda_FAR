@@ -13,10 +13,24 @@ docs/INDICATORS.md. Status: "listo" (shown), "por_construir", "sin_fuente".
 from dataclasses import dataclass
 from decimal import Decimal
 
-from central.motor import formato, tabla_comercial
+from central.motor import formato, scorecard, semaforos, tabla_comercial
 from central.motor.comparativos import Variacion
 
 from .lectura import Seleccion
+
+
+def _pct(x: Decimal) -> str:
+    return f"{x * 100:.0f}%"
+
+
+def regla_meta_historica() -> str:
+    """The scorecard's historic-target light (owner, 2026-11-18: the dashboards
+    use it on gross sales), written from Central's own constants."""
+    crece = _pct(scorecard.CRECIMIENTO_META - 1)
+    return (f"Semáforo (scorecard de Central): meta = mismo periodo del año anterior +{crece}; sin año "
+            f"anterior, el periodo inmediato anterior +{crece}; solo sucursales comparables, y sin "
+            f"comparativo fiable no hay meta ni color. Verde desde el {_pct(semaforos.PCT_META_VERDE)} de "
+            f"la meta, naranja desde el {_pct(semaforos.PCT_META_NARANJA)}, rojo abajo.")
 
 
 @dataclass(frozen=True)
@@ -28,6 +42,7 @@ class Indicador:
     fuente: str
     regla: str
     fila_comercial: str  # key of Central's tabla_comercial row it shows
+    regla_semaforo: str = ""  # empty = the card carries no light
 
 
 CATALOGO = [
@@ -42,6 +57,7 @@ CATALOGO = [
         "solo sucursales comparables (con datos en al menos 90% de los días de ambos periodos). "
         "Flecha: sube/baja si cambia más de ±1%; «s/cf» si algún periodo no tiene datos fiables.",
         "venta_bruta",
+        regla_meta_historica(),
     ),
 ]
 POR_CLAVE = {i.clave: i for i in CATALOGO}
@@ -60,6 +76,30 @@ class Tarjeta:
     # The period's value over the branches compared with last year only (equal
     # to `valor` when none is left out): the side the change is computed on.
     valor_comparable_anio: Decimal | None = None
+    # Central's scorecard light of the row (verde / naranja / rojo, None = no
+    # target), the value as a share of the target, and the target itself with
+    # its base (META_ANIO = last year, META_ANTERIOR = previous period).
+    semaforo: str | None = None
+    logro: Decimal | None = None
+    meta: Decimal | None = None
+    meta_contra: str | None = None
+
+    @property
+    def meta_texto(self) -> str:
+        return formato.valor(self.meta, self.formato)
+
+    @property
+    def logro_texto(self) -> str:
+        return "" if self.logro is None else f"{self.logro * 100:.1f}%"
+
+    @property
+    def meta_base_texto(self) -> str:
+        crece = _pct(scorecard.CRECIMIENTO_META - 1)
+        if self.meta_contra == tabla_comercial.META_ANIO:
+            return f"año anterior +{crece}"
+        if self.meta_contra == tabla_comercial.META_ANTERIOR:
+            return f"periodo anterior +{crece} (sin año anterior)"
+        return ""
 
     @property
     def comparable_texto(self) -> str:
@@ -98,7 +138,14 @@ def tarjetas(sel: Seleccion, pestana: str) -> list[Tarjeta]:
         if ind.pestana != pestana:
             continue
         f = filas[ind.fila_comercial]
+        con_luz = bool(ind.regla_semaforo) and f.semaforo is not None
+        meta = None
+        if con_luz:
+            base = f.anio_anterior if f.meta_contra == tabla_comercial.META_ANIO else f.anterior
+            meta = scorecard.meta_historica(base, None)  # the same target Central's light used
         salida.append(Tarjeta(ind, f.actual, f.anio_anterior, f.var_anio, f.anterior, f.var_anterior,
                               sel.contra_anio.excluidas, f.indicador.formato,
-                              comparables[ind.fila_comercial]))
+                              comparables[ind.fila_comercial],
+                              f.semaforo if con_luz else None, f.logro if con_luz else None, meta,
+                              f.meta_contra if con_luz else None))
     return salida

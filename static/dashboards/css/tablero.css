@@ -81,3 +81,10 @@ h2 { color: var(--verde-oscuro); font-size: 18px; margin: 24px 0 8px; }
 .leido { margin-top: 12px; }
 .aviso { border-left: 4px solid var(--naranja); }
 @media (max-width: 600px) { .filtros select { min-width: 0; width: 100%; } .filtros label { width: 100%; } }
+
+/* Traffic lights (scorecard colours of Central's reports). */
+.luz { display: inline-block; width: 16px; height: 16px; border-radius: 50%; margin-right: 10px; vertical-align: middle; position: relative; top: -3px; }
+.luz-verde { background: #1e7d3a; }
+.luz-naranja { background: var(--naranja); }
+.luz-rojo { background: #b3261e; }
+.kpi-meta { font-size: 13px; font-weight: 600; color: var(--verde-oscuro); margin-bottom: 6px; }

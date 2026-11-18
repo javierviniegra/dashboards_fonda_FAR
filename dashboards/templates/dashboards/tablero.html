@@ -35,12 +35,21 @@
   {% for t in tarjetas %}
   <article class="kpi">
     <span class="kpi-titulo">{{ t.indicador.etiqueta }}</span>
-    <div class="kpi-valor">{{ t.valor_texto }}</div>
+    <div class="kpi-valor">{% if t.semaforo %}<span class="luz luz-{{ t.semaforo }}" title="Semáforo: {{ t.semaforo }}"></span>{% endif %}{{ t.valor_texto }}</div>
+    {% if t.semaforo %}
+    <div class="kpi-meta">
+      {{ t.logro_texto }} de la meta ({{ t.meta_texto }}, {{ t.meta_base_texto }})
+    </div>
+    {% elif t.indicador.regla_semaforo %}
+    <div class="kpi-meta muted">Sin semáforo: no hay meta fiable para este periodo.</div>
+    {% endif %}
     <div class="kpi-comp">
       <span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span>
       vs {{ anio_anterior.etiqueta|default:"año anterior" }}: {{ t.anio_texto }}
     </div>
-    {% if t.excluidas_anio %}
+    {% if t.excluidas_anio and t.anio_anterior is None %}
+    <div class="kpi-nota">Sin el periodo del año anterior completo: no hay comparación anual.</div>
+    {% elif t.excluidas_anio %}
     <div class="kpi-nota">
       Comparación sobre las sucursales comparables ({{ t.comparable_texto }} este periodo). Fuera por no tener
       el periodo del año anterior completo: {{ t.excluidas_anio|join:", " }}.

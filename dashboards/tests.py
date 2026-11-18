@@ -165,6 +165,40 @@ class SeleccionTests(TestCase):
         (t,) = indicadores.tarjetas(lectura.seleccionar(self.lec, "a"), "portada")
         self.assertEqual((t.valor, t.anterior, t.excluidas_anio), (Decimal(1000), Decimal(900), []))
 
+    def test_light_consolidated_against_last_year_plus_5(self):
+        (t,) = indicadores.tarjetas(lectura.seleccionar(self.lec, None), "portada")
+        self.assertEqual(t.meta, Decimal(840))                      # A's 800 x 1.05
+        self.assertEqual((t.semaforo, t.meta_base_texto), ("verde", "año anterior +5%"))
+        self.assertEqual(t.logro_texto, "119.0%")                   # 1000 / 840
+
+    def test_light_new_branch_against_previous_period(self):
+        (t,) = indicadores.tarjetas(lectura.seleccionar(self.lec, "b"), "portada")
+        self.assertEqual(t.meta, Decimal(420))                      # 400 x 1.05
+        self.assertIn("periodo anterior", t.meta_base_texto)
+
+    def _una(self, actual, anio, dias_anio=7, dias_ant=7):
+        a = Sucursal(pk=1, clave="a", nombre="A")
+        lec = lectura.Lectura([a], self.p, self.ant, self.anio, [_m(self.p, actual, 7)],
+                              [_m(self.ant, 900, dias_ant)], [_m(self.anio, anio, dias_anio)],
+                              datetime(2026, 11, 18, tzinfo=dt_tz.utc), "prod")
+        return indicadores.tarjetas(lectura.seleccionar(lec, "a"), "portada")[0]
+
+    def test_light_orange_and_red(self):
+        self.assertEqual(self._una(1000, 1000).semaforo, "naranja")  # 95.2% of 1050
+        self.assertEqual(self._una(850, 1000).semaforo, "rojo")      # 81.0%
+
+    def test_unreliable_last_year_falls_back_to_previous_period(self):
+        # 5 of 7 days last year: the branch leaves that comparison (Central's
+        # comparable-branches rule), so the target is the previous week +5%.
+        t = self._una(1000, 1000, dias_anio=5)
+        self.assertEqual(t.meta, Decimal(945))
+        self.assertIn("periodo anterior", t.meta_base_texto)
+
+    def test_no_light_without_any_reliable_base(self):
+        t = self._una(1000, 1000, dias_anio=5, dias_ant=5)
+        self.assertIsNone(t.semaforo)
+        self.assertIsNone(t.meta)
+
     def test_unknown_branch(self):
         with self.assertRaises(KeyError):
             lectura.seleccionar(self.lec, "zzz")
