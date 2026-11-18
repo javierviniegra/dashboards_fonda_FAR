@@ -2,7 +2,7 @@
 
 Master continuity document. Regenerated **in full** (never as patches) at every chat handoff. **Read this first when picking the project up in a fresh chat**, then `README.md` and `docs/DECISIONS.md`.
 
-Last generated: 2026-11-18 (block 1). Repo: `dashboards_fonda_FAR` (local git only; GitHub repo not created yet). Blocks 0 and 1 committed (`1a1d456`, `f19e495`, guard `b099055`); sales light in dev.
+Last generated: 2026-11-18 (block 1). Repo: https://github.com/javierviniegra/dashboards_fonda_FAR (private; first push 2026-11-18, `main` at `987e850`). Blocks 0 and 1 committed (`1a1d456`, `f19e495`, guard `b099055`); sales light in dev.
 
 ---
 
@@ -42,7 +42,7 @@ v1 scope (owner, 2026-11-17): Dirección General overview, Comercial (block 3, t
 - Secrets only in `config/.env` (placeholders in `config/.env.example`).
 - Every number traces to approved Python code (Central's engine, pinned).
 - Small, explained blocks; **commit only after the owner approves each block**; README + `docs/DECISIONS.md` in the same commit. Code, commits and docs in English; chat and UI in Spanish (with accents).
-- Local dev needs no permission. Anything production or external (creating the GitHub repo, push, Apache, the VM, prod DBs) needs confirmation first. `gh` is not installed: the owner creates the empty private repo on github.com (or propose `winget install GitHub.cli`).
+- Local dev needs no permission. Anything production or external (push, Apache, the VM, prod DBs) needs confirmation first. `gh` is not installed. The GitHub repo exists (created by the owner 2026-11-18).
 - Production later: VM SVR-HIKCENTER (`C:\Apps\DashboardsFonda`, Waitress + WhiteNoise, own port), Apache proxy `http://187.251.203.223:8088/dashboards_fonda/`; copy Presupuestos AP's deploy pattern (`deploy/update.ps1`, `actualizar_diario.ps1`), confirm before touching production. The VM's clone needs `--recurse-submodules`.
 
 ---
