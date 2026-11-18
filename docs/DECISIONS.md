@@ -2,6 +2,17 @@
 
 Newest first. Each entry: what, why, and where it applies.
 
+## 2026-11-18 — Compact cards with tooltips; Comercial tab with charts (owner)
+
+- **Owner (2026-11-18): "necesito gráficas, y las tarjetas más pequeñas, que tengan comentarios en nube cuando te pones sobre el".** Cards now show only the name, the value with its light and the change vs last year; the target, both comparisons, the comparable branches' value, estimated / preliminary notes and the definition open in a tooltip on hover (or tap / keyboard focus: cards are focusable). A tooltip that would leave the screen opens to the left. Cost card titles shortened to "Costo total %" / "Costo facturado %".
+- **Comercial tab (block 3), first version:** cards gross sales, guests, check, ticket, drinks mix (same rows as the overview) and **"Venta por plataformas (delivery)"** (Central's `canal_plataformas` row, no light: no target defined). Charts, all Central's data (`dashboards/graficas.py` only translates them to JSON; `static/dashboards/js/graficas.js` paints them with Chart.js 4.5.1 from cdnjs, as Presupuestos AP):
+  - week: gross sales and guests per day vs the same week last year (`graficas.construir_graficas`);
+  - month: gross sales per day and the 12-month trend vs the previous 12 months, the month highlighted (the reading adds Central's `metricas.recolectar_diario` over 24 months for months);
+  - channel (salón / llevar / plataformas) and food / drinks shares (commercial rows);
+  - time bands, payment methods, platforms (Uber Eats / Rappi / Didi) and sales by weekday and by closing hour vs last year (`composicion.construir`, label "Año anterior" as Central).
+- **Checked:** week 46 sales-per-day chart adds up to the comparable branches' $14,091,946 of the card; October read in 83 s (with the trend series).
+- **Not done (questions left unanswered):** drinks-mix target stays the scorecard's 30% / 26% (not the draft's 28%); "Top 5 platillos" left out (no engine code); food and drinks in units and price per unit not shown yet.
+
 ## 2026-11-18 — Dirección General overview: ten cards (owner)
 
 - **Cards (owner, 2026-11-18): the ones proposed plus the draft's top cards.** In order: gross sales, net sales, guests, dining-room guests, average check, average ticket, drinks mix, total cost / net sales, invoiced cost / net sales, EBITDA. Every ready card is a row of Central's commercial table (`venta_bruta`, `venta_neta`, `clientes`, `cheque_promedio`, `ticket_promedio`, `mix_bebidas`, `costo_total_pct`, `costo_ventas_pct`) with its value, comparisons and light.

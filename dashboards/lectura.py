@@ -21,6 +21,7 @@ from django.core.cache import cache
 from django.utils import timezone
 
 from central.motor import metricas
+from central.motor.graficas import ventana_tendencia
 from central.motor.fuentes import conexiones, odoo
 from central.motor.periodo import Periodo, TipoPeriodo
 
@@ -76,6 +77,9 @@ class Lectura:
     anio: list | None
     leido_en: datetime
     origen: str  # "prod" / "dev": which sources were read
+    # A month only: gross sales per branch name and day over the 24 months
+    # ending with it (Central's metricas.recolectar_diario), for the trend chart.
+    diario: dict | None = None
 
 
 def _clave(periodo: Periodo, sucursales: list[Sucursal], costos: bool) -> str:
@@ -114,8 +118,10 @@ def leer(periodo: Periodo, costos: bool = True, refrescar: bool = False,
             return metricas.recolectar(cw, cp, sucursales, p, odoo=cli, incluir_costos=costos)
         actual, previo = una(periodo), una(anterior)
         anio = None if anio_ant is None else (previo if anio_ant == anterior else una(anio_ant))
+        diario = (metricas.recolectar_diario(cw, sucursales, *ventana_tendencia(periodo))
+                  if periodo.tipo == TipoPeriodo.MES else None)
     lectura = Lectura(sucursales, periodo, anterior, anio_ant, actual, previo, anio,
-                      timezone.now(), conexiones.origen())
+                      timezone.now(), conexiones.origen(), diario)
     if duracion is None:
         cache.set(clave, lectura)
     else:
@@ -151,6 +157,7 @@ class Seleccion:
     Central's commercial report builds it."""
 
     nombre: str
+    nombres: list[str]  # the branches it covers
     actual: metricas.Metricas
     contra_anterior: metricas.Comparacion
     contra_anio: metricas.Comparacion
@@ -174,6 +181,7 @@ def seleccionar(lectura: Lectura, clave: str | None) -> Seleccion:
     anio = [lectura.anio[i] for i in indices] if lectura.anio is not None else None
     sel = Seleccion(
         nombre,
+        nombres,
         metricas.consolidar(act, lectura.periodo),
         metricas.comparables(nombres, act, prev, lectura.periodo, lectura.anterior),
         metricas.comparables(nombres, act, anio, lectura.periodo, lectura.anio_anterior),

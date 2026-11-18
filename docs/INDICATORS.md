@@ -16,3 +16,6 @@ Status: **listo** (shown), **por construir** (source exists), **sin fuente** (no
 | `costo_total_pct` | Dirección General | Costo total / venta neta | row `costo_total_pct` (incl. Odoo estimate) | commercial band: green 37%-<39%, orange <37%, red >=39% | listo | Week 46: identical to Central |
 | `costo_ventas_pct` | Dirección General | Costo facturado / venta neta | row `costo_ventas_pct` (Presupuestos AP) | commercial band; consolidated only when every branch has it | listo | Week 46: identical to Central (Acoxpa 2.0% preliminary) |
 | `ebitda` | Dirección General | EBITDA | — (Odoo accounting, to build) | — | **sin fuente** | — |
+| `canal_plataformas` | Comercial | Venta por plataformas (delivery) | row `canal_plataformas` | no light (no target) | listo | Week 46: 3.6% consolidated (channel pie) |
+
+Charts of the Comercial tab: see `dashboards/graficas.py` (Central's `construir_graficas`, `composicion.construir`, channel and mix rows). Cards shared with the overview (sales, guests, check, ticket, mix) are the same rows.

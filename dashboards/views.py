@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from central.motor.periodo import TipoPeriodo
 
-from . import indicadores, lectura
+from . import graficas, indicadores, lectura
 from .models import Sucursal
 
 log = logging.getLogger(__name__)
@@ -21,6 +21,9 @@ PESTANAS = [
     ("operaciones", "Operaciones", "Bloque 4 · Salón, cocina y gastos operativos"),
 ]
 _POR_SLUG = {p[0]: p for p in PESTANAS}
+# Tabs that draw Central's charts under their cards (owner, 2026-11-18: charts
+# in Comercial; compact cards with the details in a hover tooltip).
+PESTANAS_CON_GRAFICAS = {"comercial"}
 TIPOS_ETIQUETA = {TipoPeriodo.SEMANA: "Semana", TipoPeriodo.MES: "Mes"}
 
 
@@ -49,7 +52,7 @@ def tablero(request, pestana):
         raise Http404
     slug, titulo, subtitulo = _POR_SLUG[pestana]
     ctx = {"pestanas": PESTANAS, "activa": slug, "titulo": titulo, "subtitulo": subtitulo}
-    if any(i.pestana == slug for i in indicadores.CATALOGO):
+    if any(slug in i.pestanas for i in indicadores.CATALOGO):
         sucursal, periodo = _filtros(request)
         ctx.update({
             "con_filtros": True,
@@ -73,9 +76,14 @@ def tablero(request, pestana):
                 "anterior": lec.anterior,
                 "excluidas_anio": sel.contra_anio.excluidas,
                 "anio_sin_base": bool(sel.contra_anio.excluidas) and sel.contra_anio.base is None,
-                "sin_costo": sel.sin_costo,
+                # The cost note only where the tab shows costs.
+                "sin_costo": sel.sin_costo if any(i.es_costo and slug in i.pestanas
+                                                  for i in indicadores.CATALOGO) else (),
                 "facturado_incompleto": sel.facturado_incompleto,
             })
+            if slug in PESTANAS_CON_GRAFICAS:
+                ctx["graficas"] = (graficas.de_venta(lec, sel) + graficas.de_mezcla(sel)
+                                   + graficas.de_composicion(sel))
         except Exception:  # sources unreachable: say so, never a 500 in the meeting
             log.exception("No se pudieron leer las fuentes")
             ctx["error_fuentes"] = True

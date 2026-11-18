@@ -86,7 +86,7 @@ from django.core.management import call_command
 from central.motor.metricas import Metricas
 from central.motor.periodo import Periodo, TipoPeriodo
 
-from . import indicadores, lectura
+from . import graficas, indicadores, lectura
 from .management.commands.cargar_sucursales import leer_lista_central
 from .models import Sucursal
 
@@ -304,7 +304,7 @@ class PortadaTests(TestCase):
         self.assertContains(r, "No se pudieron leer las fuentes")
 
     def test_other_tabs_still_under_construction(self):
-        self.assertContains(self.client.get(reverse("tablero", args=["comercial"])), "En construcción")
+        self.assertContains(self.client.get(reverse("tablero", args=["operaciones"])), "En construcción")
 
     def test_help_lists_indicators(self):
         self.assertContains(self.client.get(reverse("ayuda")), indicadores.CATALOGO[0].definicion[:40])
@@ -342,3 +342,77 @@ class PrecalentarTests(TestCase):
             n = rec.call_count
             lectura.leer(p)                       # a viewer: no new read
             self.assertEqual(rec.call_count, n)
+
+
+class GraficasTests(TestCase):
+    def setUp(self):
+        self.p = Periodo.semana_de(date(2026, 11, 11))
+        self.ant, self.anio = self.p.anterior(), self.p.mismo_periodo_anio_anterior()
+        a = Sucursal(pk=1, clave="a", nombre="A")
+
+        def m(per, venta):
+            x = _m(per, venta, 7)
+            x.venta_por_dia = {per.desde: Decimal(venta)}
+            x.clientes_por_dia = {per.desde: Decimal(10)}
+            x.canal = {"salon": Decimal(venta) * Decimal("0.8"), "plataformas": Decimal(venta) * Decimal("0.2")}
+            return x
+        self.lec = lectura.Lectura([a], self.p, self.ant, self.anio, [m(self.p, 1000)], [m(self.ant, 900)],
+                                   [m(self.anio, 800)], datetime(2026, 11, 18, tzinfo=dt_tz.utc), "prod")
+        self.sel = lectura.seleccionar(self.lec, None)
+
+    def test_week_sales_and_guests_vs_last_year_from_central(self):
+        venta, clientes = graficas.de_venta(self.lec, self.sel)
+        self.assertEqual(venta["etiquetas"][0][:3], "Lun")
+        self.assertEqual(venta["series"][0]["valores"][0], 1000.0)
+        self.assertEqual(venta["series"][1]["valores"][0], 800.0)       # last year, by position
+        self.assertTrue(venta["pesos"])
+        self.assertFalse(clientes["pesos"])
+
+    def test_channel_pie_from_central_rows(self):
+        canales = {g["id"]: g for g in graficas.de_mezcla(self.sel)}.get("canales")
+        if canales is None:          # channel shares need ticket detail in Central's rows
+            self.skipTest("no channel rows without ticket detail")
+        self.assertAlmostEqual(sum(canales["valores"]), 100.0, places=3)
+
+    def test_no_composition_without_hourly_detail(self):
+        self.assertEqual(graficas.de_composicion(self.sel), [])
+
+
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class ComercialTests(TestCase):
+    def setUp(self):
+        self.client.force_login(User.objects.create_user("director", password="x-prueba-123"))
+        Sucursal.objects.create(clave="a", nombre="A", wansoft_subsidiary_id=1)
+
+    def _lectura(self, periodo, costos=True, refrescar=False):
+        a = Sucursal.objects.get(clave="a")
+        ant, anio = periodo.anterior(), periodo.mismo_periodo_anio_anterior()
+        actual = _m(periodo, 1234, periodo.dias)
+        actual.venta_por_dia = {periodo.desde: Decimal(1234)}
+        return lectura.Lectura([a], periodo, ant, anio, [actual], [_m(ant, 1000, ant.dias)],
+                               [_m(anio, 1100, anio.dias)], datetime(2026, 11, 18, 15, 0, tzinfo=dt_tz.utc),
+                               "prod", {"A": {}} if periodo.tipo == TipoPeriodo.MES else None)
+
+    def test_comercial_tab_has_cards_charts_and_tooltips(self):
+        with mock.patch.object(lectura, "leer", side_effect=self._lectura):
+            r = self.client.get(reverse("tablero", args=["comercial"]))
+        self.assertContains(r, "Venta por plataformas (delivery)")
+        self.assertContains(r, 'id="datos-graficas"')
+        self.assertContains(r, "chart.umd.min.js")
+        self.assertContains(r, 'class="nube"')
+        self.assertNotContains(r, "Costo total %")       # costs live in the overview
+
+    def test_month_has_trend_chart(self):
+        hoy_mes = lectura.periodos_cerrados(TipoPeriodo.MES)[0]
+        with mock.patch.object(lectura, "leer", side_effect=self._lectura):
+            r = self.client.get(reverse("tablero", args=["comercial"]),
+                                {"tipo": "mes", "desde": hoy_mes.desde.isoformat()})
+        self.assertContains(r, "Venta bruta mensual vs año anterior")
+
+    def test_overview_has_no_charts(self):
+        with mock.patch.object(lectura, "leer", side_effect=self._lectura):
+            r = self.client.get(reverse("tablero", args=["portada"]))
+        self.assertNotContains(r, 'id="datos-graficas"')

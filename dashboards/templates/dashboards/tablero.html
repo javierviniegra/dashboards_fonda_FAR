@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ titulo }}{% endblock %}
 {% block content %}
 <h1>{{ titulo }}{% if seleccion %} · {{ seleccion.nombre }}{% endif %}</h1>
@@ -41,38 +42,74 @@
 {% endif %}
 {% if sin_costo %}<p class="nota-pagina">No se considera el costo de {{ sin_costo|join:", " }} (así está configurada la sucursal).</p>{% endif %}
 
+<p class="pista muted">Pasa el cursor sobre una tarjeta (o tócala) para ver la meta y las comparaciones.</p>
 <section class="tarjetas">
   {% for t in tarjetas %}
   {% if t.mostrar %}
-  <article class="kpi">
-    <span class="kpi-titulo">{{ t.indicador.etiqueta }}{% if t.estimado %} · estimado{% endif %}{% if t.preliminar %} · preliminar{% endif %}</span>
-    <div class="kpi-valor">{% if t.semaforo %}<span class="luz luz-{{ t.semaforo }}" title="Semáforo: {{ t.semaforo }}"></span>{% endif %}{{ t.valor_texto }}</div>
-    {% if t.semaforo and t.logro_texto %}
-    <div class="kpi-meta">{{ t.logro_texto }} de la meta ({{ t.meta_texto }}, {{ t.meta_base_texto }})</div>
-    {% elif t.semaforo %}
-    <div class="kpi-meta">{{ t.meta_corta }}</div>
-    {% elif t.indicador.luz %}
-    <div class="kpi-meta muted">Sin semáforo: no hay dato o meta fiable para este periodo.</div>
-    {% endif %}
-    <div class="kpi-comp">
-      <span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span>
-      vs {{ anio_anterior.etiqueta|default:"año anterior" }}: {{ t.anio_texto }}
-      {% if excluidas_anio and t.anio_anterior is not None %}<span class="muted"> (comparables: {{ t.comparable_texto }})</span>{% endif %}
-    </div>
-    <div class="kpi-comp secundaria">
-      <span class="var var-{{ t.var_anterior.color }}">{{ t.var_anterior_texto }}</span>
-      vs {{ anterior.etiqueta }}: {{ t.anterior_texto }}
+  <article class="kpi" tabindex="0">
+    <span class="kpi-titulo">{{ t.indicador.etiqueta }}{% if t.estimado %} · est.{% endif %}{% if t.preliminar %} · prel.{% endif %}</span>
+    <div class="kpi-valor">{% if t.semaforo %}<span class="luz luz-{{ t.semaforo }}" aria-label="Semáforo {{ t.semaforo }}"></span>{% endif %}{{ t.valor_texto }}</div>
+    <div class="kpi-linea"><span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span> vs año ant.</div>
+    <div class="nube" role="tooltip">
+      {% if t.semaforo and t.logro_texto %}
+        <p><strong>{{ t.logro_texto }} de la meta</strong> ({{ t.meta_texto }}, {{ t.meta_base_texto }}).</p>
+      {% elif t.semaforo %}
+        <p><strong>{{ t.meta_corta|capfirst }}.</strong></p>
+      {% elif t.indicador.luz %}
+        <p>Sin semáforo: no hay dato o meta fiable para este periodo.</p>
+      {% endif %}
+      <p><span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span>
+        vs {{ anio_anterior.etiqueta|default:"año anterior" }}: {{ t.anio_texto }}{% if excluidas_anio and t.anio_anterior is not None %} (comparables este periodo: {{ t.comparable_texto }}){% endif %}.</p>
+      <p><span class="var var-{{ t.var_anterior.color }}">{{ t.var_anterior_texto }}</span>
+        vs {{ anterior.etiqueta }}: {{ t.anterior_texto }}.</p>
+      {% if t.estimado %}<p>Estimado: Odoo todavía no termina de facturar la venta de esos días.</p>{% endif %}
+      {% if t.preliminar %}<p>Preliminar: las facturas del periodo se siguen capturando.</p>{% endif %}
+      <p class="nube-def">{{ t.indicador.definicion }}</p>
     </div>
   </article>
   {% else %}
-  <article class="kpi kpi-gris">
+  <article class="kpi kpi-gris" tabindex="0">
     <span class="kpi-titulo">{{ t.indicador.etiqueta }}</span>
     <div class="kpi-valor">—</div>
-    <div class="kpi-nota-gris">{% if t.aviso %}{{ t.aviso }}{% else %}{{ t.indicador.pendiente }}{% endif %}</div>
+    <div class="kpi-linea">{% if t.aviso %}no aplica{% else %}pendiente{% endif %}</div>
+    <div class="nube" role="tooltip">
+      <p>{% if t.aviso %}{{ t.aviso }}{% else %}{{ t.indicador.pendiente }}{% endif %}</p>
+      <p class="nube-def">{{ t.indicador.definicion }}</p>
+    </div>
   </article>
   {% endif %}
   {% endfor %}
 </section>
+
+<script>
+  /* A tooltip that would leave the screen on the right opens to the left. */
+  document.querySelectorAll(".kpi").forEach(function (k) {
+    function ajustar() {
+      var n = k.querySelector(".nube");
+      if (!n) { return; }
+      n.classList.remove("nube-izq");
+      if (n.getBoundingClientRect().right > document.documentElement.clientWidth - 8) { n.classList.add("nube-izq"); }
+    }
+    k.addEventListener("mouseenter", ajustar);
+    k.addEventListener("focus", ajustar);
+  });
+</script>
+
+{% if graficas %}
+<section class="graficas">
+  {% for g in graficas %}
+  <figure class="card grafica {% if g.tipo == 'pastel' %}grafica-pastel{% else %}grafica-ancha{% endif %}">
+    <figcaption>{{ g.titulo }}</figcaption>
+    <div class="lienzo"><canvas id="g-{{ g.id }}" aria-label="{{ g.titulo }}"></canvas></div>
+    {% if g.nota %}<p class="muted nota-grafica">{{ g.nota }}</p>{% endif %}
+  </figure>
+  {% endfor %}
+</section>
+{{ graficas|json_script:"datos-graficas" }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<script src="{% static 'dashboards/js/graficas.js' %}"></script>
+{% endif %}
+
 <p class="leido muted">
   Leído a las {{ leido_en|time:"H:i" }} del {{ leido_en|date:"j \d\e F"|lower }} (fuentes {{ origen }}); se vuelve a leer después de una hora.
   <a href="?sucursal={{ sucursal_sel }}&amp;tipo={{ tipo_sel }}&amp;desde={{ desde_sel }}&amp;refrescar=1"

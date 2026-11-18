@@ -73,7 +73,7 @@ _COSTO_COMPARACION = _COMPARACION + " Los costos son sobre la venta neta (sin IV
 class Indicador:
     clave: str
     etiqueta: str
-    pestana: str
+    pestanas: tuple[str, ...]  # tabs that show it
     definicion: str
     fuente: str
     regla: str
@@ -90,47 +90,51 @@ class Indicador:
 
 
 CATALOGO = [
-    Indicador("venta_bruta", "Venta bruta (con IVA)", "portada",
+    Indicador("venta_bruta", "Venta bruta (con IVA)", ("portada", "comercial"),
               f"Venta total con IVA de los cortes de caja del periodo ({_DIA_OPERATIVO}).",
               "Wansoft (cortes de caja), con la capa unificada Wansoft/Odoo.",
               _COMPARACION, "venta_bruta", LUZ_HISTORICA),
-    Indicador("venta_neta", "Venta neta (sin IVA)", "portada",
+    Indicador("venta_neta", "Venta neta (sin IVA)", ("portada",),
               f"Venta sin IVA de los cortes de caja del periodo ({_DIA_OPERATIVO}). Sin semáforo: no hay "
               "presupuesto de ventas en ninguna fuente.",
               "Wansoft (cortes de caja).", _COMPARACION, "venta_neta"),
-    Indicador("clientes", "Clientes", "portada",
+    Indicador("clientes", "Clientes", ("portada", "comercial"),
               "Personas registradas en las cuentas del periodo, de todas las órdenes (salón, para llevar y "
               "plataformas; cada orden fuera de salón cuenta 1).",
               "Wansoft (cortes de caja).", _COMPARACION, "clientes", LUZ_HISTORICA),
-    Indicador("afluencia_salon", "Afluencia de salón", "portada",
+    Indicador("afluencia_salon", "Afluencia de salón", ("portada",),
               "Personas atendidas en las órdenes de restaurante (salón) solamente, como el scorecard de "
               "Semáforos (Power BI).",
               "Wansoft (detalle de tickets), lectura del scorecard de Central.", _COMPARACION,
               estado=PENDIENTE,
               pendiente="El motor de Central todavía no publica el conteo de salón del scorecard; se muestra "
                         "en cuanto esté en su repositorio."),
-    Indicador("cheque_promedio", "Cheque promedio", "portada",
+    Indicador("cheque_promedio", "Cheque promedio", ("portada", "comercial"),
               "Venta bruta (con IVA) / clientes.", "Wansoft (cortes de caja).", _COMPARACION,
               "cheque_promedio", LUZ_HISTORICA),
-    Indicador("ticket_promedio", "Ticket promedio", "portada",
+    Indicador("ticket_promedio", "Ticket promedio", ("portada", "comercial"),
               "Venta bruta (con IVA) / tickets (cuentas).", "Wansoft (cortes de caja).", _COMPARACION,
               "ticket_promedio", LUZ_HISTORICA),
-    Indicador("mix_bebidas", "Mezcla de bebidas", "portada",
+    Indicador("mix_bebidas", "Mezcla de bebidas", ("portada", "comercial"),
               "Venta de bebidas / venta de alimentos y bebidas, del detalle de tickets.",
               "Wansoft (detalle de tickets).", _COMPARACION, "mix_bebidas", LUZ_UMBRAL),
-    Indicador("costo_total_pct", "Costo total / venta neta", "portada",
+    Indicador("costo_total_pct", "Costo total %", ("portada",),
               "Costo total del periodo (reporte de costos de Wansoft u Odoo: costo total menos consumo) "
               "sobre la venta neta de las sucursales que lo tienen. Semana = el corte del lunes siguiente; "
               "mes = el último corte del mes. Mientras Odoo no termina de facturar, es estimado.",
               "Wansoft / Odoo (reporte de costos).", _COSTO_COMPARACION, "costo_total_pct", LUZ_BANDA,
               es_costo=True),
-    Indicador("costo_ventas_pct", "Costo facturado / venta neta", "portada",
+    Indicador("costo_ventas_pct", "Costo facturado %", ("portada",),
               "Facturas de Costo de Ventas registradas en Presupuestos AP sobre la venta neta de las "
               "sucursales que las tienen. Preliminar hasta 10 días después del cierre del mes (se siguen "
               "capturando facturas). En el consolidado solo aparece si todas las sucursales lo tienen.",
               "Presupuestos AP (facturas de Odoo).", _COSTO_COMPARACION, "costo_ventas_pct", LUZ_BANDA,
               es_costo=True),
-    Indicador("ebitda", "EBITDA", "portada",
+    Indicador("canal_plataformas", "Venta por plataformas (delivery)", ("comercial",),
+              "Venta de las órdenes de plataformas (Uber Eats, Rappi, Didi y cuentas de apps) sobre la venta "
+              "bruta, del detalle de tickets. Sin semáforo: no hay meta definida.",
+              "Wansoft (detalle de tickets).", _COMPARACION, "canal_plataformas"),
+    Indicador("ebitda", "EBITDA", ("portada",),
               "Utilidad antes de intereses, impuestos, depreciación y amortización.",
               "Contabilidad de Odoo (por construir).", "",
               estado=SIN_FUENTE,
@@ -225,7 +229,7 @@ def tarjetas(sel: Seleccion, pestana: str) -> list[Tarjeta]:
         sel.contra_anio.actual, None, None)}
     salida = []
     for ind in CATALOGO:
-        if ind.pestana != pestana:
+        if pestana not in ind.pestanas:
             continue
         if ind.estado != LISTO:
             salida.append(Tarjeta(ind))

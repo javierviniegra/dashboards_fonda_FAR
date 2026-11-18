@@ -94,3 +94,41 @@ h2 { color: var(--verde-oscuro); font-size: 18px; margin: 24px 0 8px; }
 .kpi-gris { border-top-color: #bbb; background: #f4f3ef; box-shadow: none; }
 .kpi-gris .kpi-valor { color: #999; }
 .kpi-nota-gris { font-size: 12px; color: var(--tenue); line-height: 1.4; }
+
+/* Compact cards with the details in a hover / tap tooltip (owner, 2026-11-18). */
+.pista { font-size: 12px; margin: 0 0 8px; }
+.tarjetas { grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 10px; }
+.kpi { position: relative; padding: 10px 12px 9px; border-radius: 12px; border-top-width: 3px; cursor: help; outline: none; }
+.kpi:focus-visible { box-shadow: 0 0 0 3px rgba(235, 104, 52, .45); }
+.kpi-titulo { font-size: 10.5px; letter-spacing: .04em; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-valor { font-size: 21px; margin: 4px 0 2px; white-space: nowrap; }
+.kpi-linea { font-size: 12px; color: var(--tenue); }
+.luz { width: 11px; height: 11px; margin-right: 7px; top: -2px; }
+.nube {
+  display: none; position: absolute; z-index: 20; left: 0; top: calc(100% + 8px);
+  width: 290px; max-width: 80vw; background: var(--verde-oscuro); color: #fff;
+  border-radius: 10px; padding: 10px 12px; font-size: 12.5px; line-height: 1.45;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+}
+.nube::before { content: ""; position: absolute; top: -6px; left: 18px; border: 6px solid transparent; border-top: 0; border-bottom-color: var(--verde-oscuro); }
+.nube p { margin: 0 0 5px; }
+.nube p:last-child { margin-bottom: 0; }
+.nube .nube-def { color: var(--crema); opacity: .85; font-size: 11.5px; }
+.nube .var-verde { color: #7fe0a0; }
+.nube .var-rojo { color: #ff9a8f; }
+.nube .var-gris { color: #d0d0d0; }
+.kpi:hover .nube, .kpi:focus .nube, .kpi:focus-within .nube { display: block; }
+.kpi-gris .kpi-valor { font-size: 21px; }
+
+/* Charts. */
+.graficas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 18px; }
+.grafica { margin: 0; padding: 14px 16px; }
+.grafica-ancha { grid-column: span 3; }
+.grafica-pastel { grid-column: span 2; }
+.grafica figcaption { font-size: 13px; font-weight: 700; color: var(--verde-oscuro); margin-bottom: 8px; }
+.lienzo { position: relative; height: 240px; }
+.grafica-pastel .lienzo { height: 220px; }
+.nota-grafica { font-size: 11.5px; margin: 6px 0 0; }
+@media (max-width: 900px) { .grafica-ancha, .grafica-pastel { grid-column: span 6; } }
+.nube.nube-izq { left: auto; right: 0; }
+.nube.nube-izq::before { left: auto; right: 18px; }
