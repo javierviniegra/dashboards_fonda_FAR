@@ -205,11 +205,13 @@ class SeleccionTests(TestCase):
         self.assertIsNone(t.meta)
 
     def test_every_ready_card_has_a_central_row_and_pending_ones_say_why(self):
-        from central.motor import tabla_comercial
-        filas = {i.clave for i in tabla_comercial.INDICADORES}
+        from central.motor import reporte_meseros, tabla_comercial
+        filas = {indicadores.FILA_COMERCIAL: {i.clave for i in tabla_comercial.INDICADORES},
+                 indicadores.FILA_MESEROS: {i.clave for i in reporte_meseros.INDICADORES},
+                 indicadores.FILA_TABLAJERIA: {"merma_pct", "merma_costo"}}
         for ind in indicadores.CATALOGO:
             if ind.estado == indicadores.LISTO:
-                self.assertIn(ind.fila_comercial, filas, ind.clave)
+                self.assertIn(ind.fila_comercial, filas[ind.origen_fila], ind.clave)
             else:
                 self.assertTrue(ind.pendiente, ind.clave)
 
@@ -304,7 +306,7 @@ class PortadaTests(TestCase):
         self.assertContains(r, "No se pudieron leer las fuentes")
 
     def test_other_tabs_still_under_construction(self):
-        self.assertContains(self.client.get(reverse("tablero", args=["operaciones"])), "En construcción")
+        self.assertContains(self.client.get(reverse("tablero", args=["ranking"])), "En construcción")
 
     def test_help_lists_indicators(self):
         self.assertContains(self.client.get(reverse("ayuda")), indicadores.CATALOGO[0].definicion[:40])
@@ -317,8 +319,9 @@ class PrecalentarTests(TestCase):
                          [(TipoPeriodo.SEMANA, date(2026, 11, 9)), (TipoPeriodo.MES, date(2026, 10, 1))])
 
     def test_reads_afresh_with_longer_life(self):
-        with mock.patch.object(lectura, "leer") as leer:
+        with mock.patch.object(lectura, "leer") as leer, mock.patch.object(lectura, "leer_operaciones") as ops:
             lectura.precalentar(date(2026, 11, 18))
+        self.assertEqual(ops.call_count, 2)
         self.assertEqual(leer.call_count, 2)
         for llamada in leer.call_args_list:
             self.assertTrue(llamada.kwargs["refrescar"])
@@ -416,3 +419,120 @@ class ComercialTests(TestCase):
         with mock.patch.object(lectura, "leer", side_effect=self._lectura):
             r = self.client.get(reverse("tablero", args=["portada"]))
         self.assertNotContains(r, 'id="datos-graficas"')
+
+
+# ---------------------------------------------------------------------------
+# Block 4: Operaciones (Central's waiters' report and butchery).
+# ---------------------------------------------------------------------------
+from types import SimpleNamespace
+
+from central.motor import tabla_comercial as _tc
+from central.motor.comparativos import variacion as _variacion
+from central.motor.meseros import DatosMeseros, Mesero
+
+
+def _fila(valor, formato=_tc.MONEDA):
+    """A stand-in for a row of Central's tables."""
+    return SimpleNamespace(actual=Decimal(valor), anio_anterior=None, var_anio=_variacion(None, None),
+                           anterior=None, var_anterior=_variacion(None, None),
+                           indicador=SimpleNamespace(formato=formato), semaforo=None)
+
+
+def _dm(periodo, venta, dias=7):
+    m = Mesero("Mesero 1", cuentas=Decimal(10), personas=Decimal(25), venta_bruta=Decimal(venta),
+               venta_neta=Decimal(venta), dias=Decimal(dias), minutos_mesa=Decimal(900),
+               mesas_con_tiempo=Decimal(10))
+    con_datos = periodo.dias if venta else 0          # no sales = no closings that period
+    return DatosMeseros(periodo=periodo, meseros={"Mesero 1": m}, dias_con_cierre=con_datos,
+                        dias_con_detalle=con_datos)
+
+
+def _pieza(sid, fecha, base, merma, costo, producto="Arrachera"):
+    return {"sucursal": sid, "producto": producto, "base": Decimal(base), "merma": Decimal(merma),
+            "generado": Decimal(base) - Decimal(merma), "costo": Decimal(costo), "fecha": fecha}
+
+
+class OperacionesTests(TestCase):
+    def test_draft_thresholds_waiter_sales_per_day(self):
+        ind = indicadores.POR_CLAVE["venta_mesero_dia"]
+        for valor, color in ((14500, "verde"), (14499.99, "naranja"), (11500, "naranja"), (11499.99, "rojo")):
+            self.assertEqual(indicadores._desde_fila(ind, _fila(valor)).semaforo, color, valor)
+
+    def test_draft_thresholds_tip(self):
+        ind = indicadores.POR_CLAVE["propina"]
+        for valor, color in (("0.09", "verde"), ("0.0899", "naranja"), ("0.08", "naranja"), ("0.0799", "rojo")):
+            self.assertEqual(indicadores._desde_fila(ind, _fila(valor, _tc.PORCENTAJE)).semaforo, color, valor)
+        self.assertIn("verde desde 9%", ind.regla_semaforo)
+
+    def _lectura(self):
+        p = Periodo.semana_de(date(2026, 11, 11))
+        ant, anio = p.anterior(), p.mismo_periodo_anio_anterior()
+        a = Sucursal(pk=1, clave="a", nombre="A", wansoft_subsidiary_id=10)
+        b = Sucursal(pk=2, clave="b", nombre="B", wansoft_subsidiary_id=20, considerar_costo=False)
+        piezas = [_pieza(10, p.desde, 100, 20, 1000), _pieza(20, p.desde, 100, 10, 1000)]
+        piezas_anio = [_pieza(10, anio.desde, 100, 25, 900)]
+        return lectura.LecturaOperaciones(
+            [a, b], p, ant, anio, [_dm(p, 105000), _dm(p, 80000)], [_dm(ant, 90000), _dm(ant, 70000)],
+            [_dm(anio, 95000), _dm(anio, 0, dias=0)], piezas, piezas_anio,
+            datetime(2026, 11, 18, tzinfo=dt_tz.utc), "prod")
+
+    def _tarjetas(self, clave):
+        sel = lectura.seleccionar_operaciones(self._lectura(), clave)
+        return {t.indicador.clave: t for t in indicadores.tarjetas_operaciones(sel)}
+
+    def test_branch_waiter_cards(self):
+        t = self._tarjetas("a")
+        self.assertEqual(t["venta_mesero_dia"].valor, Decimal(15000))     # 105,000 / 7 days
+        self.assertEqual(t["venta_mesero_dia"].semaforo, "verde")
+        self.assertEqual(t["tiempo_mesa"].valor, Decimal(90))
+
+    def test_consolidated_comparable_branches(self):
+        t = self._tarjetas(None)
+        self.assertEqual(t["venta_mesero"].excluidas_anio, ("B",))   # B had no data last year
+
+    def test_butchery_branch_vs_every_branch_and_last_year(self):
+        t = self._tarjetas("a")["merma_tablajeria"]
+        self.assertEqual((t.valor, t.anio_anterior), (Decimal("0.2"), Decimal("0.25")))
+        self.assertEqual(t.var_anio.color, "verde")                  # less shrinkage than last year
+        self.assertIn("Todas las sucursales: 15.0%", t.extra[0])
+        self.assertEqual(self._tarjetas("a")["costo_merma"].valor, Decimal(200))   # 20 kg x $10/kg
+
+    def test_butchery_cost_not_considered(self):
+        t = self._tarjetas("b")
+        self.assertTrue(t["merma_tablajeria"].mostrar)
+        self.assertIn("No se considera el costo", t["costo_merma"].aviso)
+
+    def test_no_butchery_reading(self):
+        lec = self._lectura()
+        lec.piezas_actual = None
+        t = {x.indicador.clave: x for x in indicadores.tarjetas_operaciones(lectura.seleccionar_operaciones(lec, "a"))}
+        self.assertIn("Sin datos de tablajería", t["merma_tablajeria"].aviso)
+
+    def test_pending_cards(self):
+        t = self._tarjetas(None)
+        for clave in ("costo_teorico", "platillos_86", "gastos_operativos"):
+            self.assertFalse(t[clave].mostrar)
+
+
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class OperacionesVistaTests(TestCase):
+    def setUp(self):
+        self.client.force_login(User.objects.create_user("director", password="x-prueba-123"))
+        Sucursal.objects.create(clave="a", nombre="A", wansoft_subsidiary_id=10)
+
+    def test_tab_renders_from_its_own_reading(self):
+        lec = OperacionesTests()._lectura()
+        lec.sucursales = [Sucursal.objects.get(clave="a")]
+        lec.meseros_actual, lec.meseros_previo, lec.meseros_anio = (lec.meseros_actual[:1], lec.meseros_previo[:1],
+                                                                    lec.meseros_anio[:1])
+        with mock.patch.object(lectura, "leer_operaciones", return_value=lec) as ops, \
+             mock.patch.object(lectura, "leer") as leer:
+            r = self.client.get(reverse("tablero", args=["operaciones"]))
+        self.assertTrue(ops.called)
+        self.assertFalse(leer.called)                               # the commercial reading is not paid here
+        self.assertContains(r, "Venta por mesero por día")
+        self.assertContains(r, "Merma tablajería %")
+        self.assertContains(r, "Gas, carbón, limpieza y mantenimiento")

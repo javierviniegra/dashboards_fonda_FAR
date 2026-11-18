@@ -19,3 +19,24 @@ Status: **listo** (shown), **por construir** (source exists), **sin fuente** (no
 | `canal_plataformas` | Comercial | Venta por plataformas (delivery) | row `canal_plataformas` | no light (no target) | listo | Week 46: 3.6% consolidated (channel pie) |
 
 Charts of the Comercial tab: see `dashboards/graficas.py` (Central's `construir_graficas`, `composicion.construir`, channel and mix rows). Cards shared with the overview (sales, guests, check, ticket, mix) are the same rows.
+
+## Operaciones (block 4)
+
+| Key | Indicator | Engine code | Light | Status |
+|---|---|---|---|---|
+| `venta_mesero_dia` | Venta por mesero por día | `reporte_meseros` row `venta_mesero_dia` | **draft: green >= $14,500, orange >= $11,500** (rule in `indicadores.UMBRALES_BORRADOR`) | listo |
+| `venta_mesero` | Venta por mesero | row `venta_mesero` | — | listo |
+| `plantilla` | Meseros activos | row `plantilla` | — | listo |
+| `cuentas` | Mesas atendidas | row `cuentas` | — | listo |
+| `propina` | Propina % (of card payments) | row `propina` | **draft: green >= 9%, orange >= 8%** | listo |
+| `tiempo_mesa` | Tiempo de mesa (min) | row `tiempo_mesa` | — | listo |
+| `pct_control` | Cortesías + descuentos % | row `pct_control` | — | listo |
+| `cortesias`, `descuentos`, `cancelaciones` | Control ($) | rows of the same names | — | listo |
+| `merma_tablajeria` | Merma tablajería % | `tablajeria.construir` total `indice` (vs last year, vs every branch) | — | listo |
+| `costo_merma` | Costo de la merma | `tablajeria` total `costo_merma` | — | listo |
+| `costo_teorico` | Costo real vs teórico | — | — | pendiente (no engine code) |
+| `platillos_86` | Platillos en «86» y devoluciones | — | — | sin fuente |
+| `gastos_operativos` | Gas, carbón, limpieza, mantenimiento | Central's scorecard expenses (not on GitHub) | — | pendiente |
+
+Week 46 2026: the ten waiters' cards identical to Central's `reporte_meseros.armar` for the consolidated and every branch (200 comparisons).
+

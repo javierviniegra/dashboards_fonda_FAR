@@ -11,17 +11,28 @@ docs/INDICATORS.md. Status: "listo" (shown), "pendiente" (source exists, not
 reachable yet), "sin_fuente" (no systematized source yet).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 
-from central.motor import formato, scorecard, semaforos, tabla_comercial
-from central.motor.comparativos import Variacion, kpi_costo
+from central.motor import formato, reporte_meseros, scorecard, semaforos, tabla_comercial
+from central.motor.comparativos import Variacion, kpi_costo, variacion
 
-from .lectura import Seleccion
+from .lectura import Seleccion, SeleccionOperaciones
 
 LISTO, PENDIENTE, SIN_FUENTE = "listo", "pendiente", "sin_fuente"
 # Kinds of light, each with its rule written from Central's constants.
 LUZ_HISTORICA, LUZ_UMBRAL, LUZ_BANDA = "historica", "umbral", "banda"
+# Thresholds of the owner's draft (Portal Directivo, "Reglas oficiales de
+# semaforos"), adopted for the dashboards by the owner on 2026-11-18. Central
+# has no rule for these two: they live here, painted with Central's
+# `semaforos.umbral` (higher is better; the draft's yellow = Central's orange).
+LUZ_BORRADOR = "borrador"
+UMBRALES_BORRADOR = {
+    "venta_mesero_dia": (Decimal("14500"), Decimal("11500")),   # >= $14,500 green; >= $11,500 orange
+    "propina": (Decimal("0.09"), Decimal("0.08")),              # >= 9% green; >= 8% orange
+}
+# Where a card's row comes from.
+FILA_COMERCIAL, FILA_MESEROS, FILA_TABLAJERIA = "comercial", "meseros", "tablajeria"
 
 
 def _pct(x: Decimal) -> str:
@@ -51,8 +62,20 @@ def regla_costo() -> str:
             f"registró de menos); rojo desde {_pct(k.naranja)}.")
 
 
-def meta_corta(luz: str) -> str:
+def _umbral_texto(fila: str, v: Decimal) -> str:
+    return f"${v:,.0f}" if fila == "venta_mesero_dia" else _pct(v)
+
+
+def regla_borrador(fila: str) -> str:
+    verde, naranja = UMBRALES_BORRADOR[fila]
+    return (f"Semáforo (reglas del portal directivo, adoptadas el 18-nov-2026): verde desde "
+            f"{_umbral_texto(fila, verde)}, naranja desde {_umbral_texto(fila, naranja)}, rojo abajo.")
+
+
+def meta_corta(luz: str, fila: str = "") -> str:
     """One line under a card's value for fixed-threshold and band lights."""
+    if luz == LUZ_BORRADOR:
+        return f"meta: {_umbral_texto(fila, UMBRALES_BORRADOR[fila][0])} o más"
     if luz == LUZ_UMBRAL:
         return f"meta: {_pct(scorecard.POR_CLAVE['mix_bebidas'].verde)} o más"
     if luz == LUZ_BANDA:
@@ -82,9 +105,12 @@ class Indicador:
     estado: str = LISTO
     es_costo: bool = False
     pendiente: str = ""  # why it is not shown yet (estado != LISTO)
+    origen_fila: str = FILA_COMERCIAL  # which of Central's tables the row comes from
 
     @property
     def regla_semaforo(self) -> str:
+        if self.luz == LUZ_BORRADOR:
+            return regla_borrador(self.fila_comercial)
         return {LUZ_HISTORICA: regla_meta_historica, LUZ_UMBRAL: regla_mix,
                 LUZ_BANDA: regla_costo}.get(self.luz, lambda: "")()
 
@@ -134,6 +160,66 @@ CATALOGO = [
               "Venta de las órdenes de plataformas (Uber Eats, Rappi, Didi y cuentas de apps) sobre la venta "
               "bruta, del detalle de tickets. Sin semáforo: no hay meta definida.",
               "Wansoft (detalle de tickets).", _COMPARACION, "canal_plataformas"),
+    # --- Operaciones (block 4, owner 2026-11-18): Central's waiters' report and butchery ---
+    Indicador("venta_mesero_dia", "Venta por mesero por día", ("operaciones",),
+              "Venta de salón (con IVA) de los meseros activos / días que trabajó cada uno (días con al menos "
+              "una cuenta). Como el reporte de meseros de Central.",
+              "Wansoft (detalle de tickets, órdenes de restaurante).", _COMPARACION, "venta_mesero_dia",
+              LUZ_BORRADOR, origen_fila=FILA_MESEROS),
+    Indicador("venta_mesero", "Venta por mesero", ("operaciones",),
+              "Venta de salón (con IVA) / meseros activos (con al menos una cuenta en el periodo).",
+              "Wansoft (detalle de tickets).", _COMPARACION, "venta_mesero", origen_fila=FILA_MESEROS),
+    Indicador("plantilla", "Meseros activos", ("operaciones",),
+              "Meseros con al menos una cuenta de salón en el periodo.",
+              "Wansoft (detalle de tickets).", _COMPARACION, "plantilla", origen_fila=FILA_MESEROS),
+    Indicador("cuentas", "Mesas atendidas", ("operaciones",),
+              "Cuentas de salón del periodo (cada cuenta = una mesa atendida).",
+              "Wansoft (detalle de tickets).", _COMPARACION, "cuentas", origen_fila=FILA_MESEROS),
+    Indicador("propina", "Propina %", ("operaciones",),
+              "Propina registrada en los pagos con tarjeta de las cuentas de salón / lo pagado con tarjeta "
+              "(definición de Central desde el 17-nov-2026; el efectivo no registra propina).",
+              "Wansoft (pagos de las cuentas de salón).", _COMPARACION, "propina", LUZ_BORRADOR,
+              origen_fila=FILA_MESEROS),
+    Indicador("tiempo_mesa", "Tiempo de mesa (min)", ("operaciones",),
+              "Minutos promedio de la apertura al cierre de la cuenta de salón (sin las cuentas que quedaron "
+              "abiertas por error: fuera del rango de minutos que usa Central).",
+              "Wansoft (detalle de tickets).", _COMPARACION, "tiempo_mesa", origen_fila=FILA_MESEROS),
+    Indicador("pct_control", "Cortesías + descuentos %", ("operaciones",),
+              "Cortesías (a precio de venta) más descuentos de salón / venta de salón.",
+              "Wansoft (detalle de tickets).", _COMPARACION, "pct_control", origen_fila=FILA_MESEROS),
+    Indicador("cortesias", "Cortesías", ("operaciones",),
+              "Cortesías de salón a precio de venta.", "Wansoft (detalle de tickets).", _COMPARACION,
+              "cortesias", origen_fila=FILA_MESEROS),
+    Indicador("descuentos", "Descuentos", ("operaciones",),
+              "Descuentos de salón (sin las cortesías).", "Wansoft (detalle de tickets).", _COMPARACION,
+              "descuentos", origen_fila=FILA_MESEROS),
+    Indicador("cancelaciones", "Cancelaciones", ("operaciones",),
+              "Cancelaciones de la sucursal a precio de venta (del corte de caja: Wansoft las quita de los "
+              "tickets).", "Wansoft (cortes de caja).", _COMPARACION, "cancelaciones", origen_fila=FILA_MESEROS),
+    Indicador("merma_tablajeria", "Merma tablajería %", ("operaciones",),
+              "Kg de merma / kg de pieza base en la tablajería (cada pieza contada una vez; los productos "
+              "porcionados quedan fuera), contra el mismo periodo del año anterior.",
+              "Wansoft (tablajería), sección de merma del reporte comercial de Central.",
+              "Contra el mismo periodo del año anterior, en puntos porcentuales (subir es peor).",
+              "merma_pct", origen_fila=FILA_TABLAJERIA),
+    Indicador("costo_merma", "Costo de la merma", ("operaciones",),
+              "Kg de merma x costo por kg de cada pieza.",
+              "Wansoft (tablajería).", "Contra el mismo periodo del año anterior.", "merma_costo",
+              origen_fila=FILA_TABLAJERIA, es_costo=True),
+    Indicador("costo_teorico", "Costo real vs teórico", ("operaciones",),
+              "Desviación del costo real de alimentos y bebidas contra el costo teórico de las recetas.",
+              "Por definir.", "", estado=PENDIENTE,
+              pendiente="El motor de Central todavía no calcula el costo teórico; hay que definir su fuente."),
+    Indicador("platillos_86", "Platillos en «86» y devoluciones", ("operaciones",),
+              "Platillos agotados y devoluciones de clientes en el periodo.",
+              "Sin fuente sistematizada.", "", estado=SIN_FUENTE,
+              pendiente="Sin fuente sistematizada: hoy no se registra en ningún sistema que el tablero pueda leer."),
+    Indicador("gastos_operativos", "Gas, carbón, limpieza y mantenimiento", ("operaciones",),
+              "Gasto en gas, carbón, limpieza y mantenimiento, en pesos y como % de la venta.",
+              "Facturas unificadas Wansoft/Odoo (lectura de gastos del scorecard de Central).", "",
+              estado=PENDIENTE,
+              pendiente="Está en el trabajo del scorecard de Central, que todavía no se sube a GitHub; se "
+                        "muestra al mover el submódulo."),
     Indicador("ebitda", "EBITDA", ("portada",),
               "Utilidad antes de intereses, impuestos, depreciación y amortización.",
               "Contabilidad de Odoo (por construir).", "",
@@ -166,6 +252,7 @@ class Tarjeta:
     estimado: bool = False  # total cost estimated (Odoo invoicing still behind)
     preliminar: bool = False  # invoiced cost still being captured
     aviso: str = ""  # why a ready card shows no value (e.g. cost not considered)
+    extra: tuple[str, ...] = ()  # more tooltip lines (e.g. the butchery vs every branch)
 
     @property
     def mostrar(self) -> bool:
@@ -217,7 +304,7 @@ class Tarjeta:
 
     @property
     def meta_corta(self) -> str:
-        return meta_corta(self.indicador.luz)
+        return meta_corta(self.indicador.luz, self.indicador.fila_comercial)
 
 
 def tarjetas(sel: Seleccion, pestana: str) -> list[Tarjeta]:
@@ -242,18 +329,66 @@ def tarjetas(sel: Seleccion, pestana: str) -> list[Tarjeta]:
                                              "costo facturado en el periodo."))
             continue
         f = filas[ind.fila_comercial]
-        meta = None
-        if ind.luz == LUZ_HISTORICA and f.semaforo is not None:
+        t = _desde_fila(ind, f, comparables[ind.fila_comercial], sel.contra_anio.excluidas)
+        if ind.fila_comercial == "costo_ventas_pct" and sel.actual.costo_preliminar:
+            t = replace(t, preliminar=True)
+        salida.append(t)
+    return salida
+
+
+def _desde_fila(ind: Indicador, f, comparable=None, excluidas=()) -> Tarjeta:
+    """A card from a row of Central's tables (commercial or waiters')."""
+    semaforo = logro = meta = contra = None
+    if ind.luz == LUZ_BORRADOR:
+        verde, naranja = UMBRALES_BORRADOR[ind.fila_comercial]
+        semaforo = semaforos.umbral(f.actual, verde, naranja, mayor_mejor=True)
+    elif ind.luz and f.semaforo is not None:
+        semaforo = f.semaforo
+        if ind.luz == LUZ_HISTORICA:
+            logro, contra = f.logro, f.meta_contra
             base = f.anio_anterior if f.meta_contra == tabla_comercial.META_ANIO else f.anterior
             meta = scorecard.meta_historica(base, None)  # the same target Central's light used
-        con_luz = bool(ind.luz) and f.semaforo is not None
-        salida.append(Tarjeta(
-            ind, f.actual, f.anio_anterior, f.var_anio, f.anterior, f.var_anterior,
-            tuple(sel.contra_anio.excluidas), f.indicador.formato, comparables[ind.fila_comercial],
-            f.semaforo if con_luz else None,
-            f.logro if con_luz and ind.luz == LUZ_HISTORICA else None, meta,
-            f.meta_contra if con_luz and ind.luz == LUZ_HISTORICA else None,
-            estimado=f.estimado,
-            preliminar=ind.fila_comercial == "costo_ventas_pct" and sel.actual.costo_preliminar,
-        ))
+    return Tarjeta(ind, f.actual, f.anio_anterior, f.var_anio, f.anterior, f.var_anterior, tuple(excluidas),
+                   f.indicador.formato, comparable, semaforo, logro, meta, contra,
+                   estimado=getattr(f, "estimado", False))
+
+
+def tarjetas_operaciones(sel: SeleccionOperaciones) -> list[Tarjeta]:
+    """The cards of the Operaciones tab: Central's waiters' report table and
+    the butchery section of its commercial report."""
+    filas = {f.indicador.clave: f for f in reporte_meseros.construir_tabla(
+        sel.actual, sel.contra_anterior, sel.contra_anio)}
+    comparables = {f.indicador.clave: f.actual for f in reporte_meseros.construir_tabla(
+        sel.contra_anio.actual, sel.contra_anterior, sel.contra_anio)}
+    carne = sel.tablajeria
+    salida = []
+    for ind in CATALOGO:
+        if "operaciones" not in ind.pestanas:
+            continue
+        if ind.estado != LISTO:
+            salida.append(Tarjeta(ind))
+        elif ind.origen_fila == FILA_MESEROS:
+            salida.append(_desde_fila(ind, filas[ind.fila_comercial], comparables[ind.fila_comercial],
+                                      sel.contra_anio.excluidas))
+        elif ind.es_costo and not sel.con_costo:
+            salida.append(Tarjeta(ind, aviso="No se considera el costo de esta sucursal (así está configurada)."))
+        elif carne is None or carne.total is None:
+            salida.append(Tarjeta(ind, aviso="Sin datos de tablajería en Wansoft para esta selección "
+                                             "(o no se pudieron leer)."))
+        else:
+            t = carne.total
+            if ind.fila_comercial == "merma_pct":
+                extra = []
+                if t.indice_grupo is not None and t.dif_grupo is not None:
+                    extra.append(f"Todas las sucursales: {formato.valor(t.indice_grupo, tabla_comercial.PORCENTAJE)} "
+                                 f"({'+' if t.dif_grupo >= 0 else ''}{t.dif_grupo * 100:.1f} pp).")
+                if carne.sin_datos:
+                    extra.append("Sin tablajería: " + ", ".join(carne.sin_datos) + ".")
+                salida.append(Tarjeta(ind, t.indice, t.indice_anio, t.var_anio, None, variacion(None, None),
+                                      formato=tabla_comercial.PORCENTAJE, extra=tuple(extra)))
+            else:
+                anio = t.anio.costo_merma if t.anio is not None else None
+                salida.append(Tarjeta(ind, t.actual.costo_merma, anio,
+                                      variacion(t.actual.costo_merma, anio, mejor_si_sube=False),
+                                      None, variacion(None, None), formato=tabla_comercial.MONEDA))
     return salida

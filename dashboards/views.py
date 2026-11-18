@@ -64,8 +64,23 @@ def tablero(request, pestana):
             "desde_sel": periodo.desde.isoformat(),
             "periodo": periodo,
         })
+        refrescar = request.GET.get("refrescar") == "1"
         try:
-            lec = lectura.leer(periodo, refrescar=request.GET.get("refrescar") == "1")
+            if slug == "operaciones":  # Central's waiters' report + butchery: a reading of its own
+                lec = lectura.leer_operaciones(periodo, refrescar=refrescar)
+                sel = lectura.seleccionar_operaciones(lec, sucursal)
+                ctx.update({
+                    "seleccion": sel,
+                    "tarjetas": indicadores.tarjetas_operaciones(sel),
+                    "leido_en": timezone.localtime(lec.leido_en),
+                    "origen": lec.origen,
+                    "anio_anterior": lec.anio_anterior,
+                    "anterior": lec.anterior,
+                    "excluidas_anio": sel.contra_anio.excluidas,
+                    "anio_sin_base": bool(sel.contra_anio.excluidas) and sel.contra_anio.base is None,
+                })
+                return render(request, "dashboards/tablero.html", ctx)
+            lec = lectura.leer(periodo, refrescar=refrescar)
             sel = lectura.seleccionar(lec, sucursal)
             ctx.update({
                 "seleccion": sel,

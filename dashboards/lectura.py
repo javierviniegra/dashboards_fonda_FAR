@@ -147,6 +147,8 @@ def precalentar(hoy: date | None = None) -> list[tuple[Periodo, float]]:
     for p in periodos_a_precalentar(hoy):
         inicio = timezone.now()
         leer(p, refrescar=True, duracion=DURACION_PRECALENTADO)
+        # Operaciones' own reading (defined below; resolved at call time).
+        leer_operaciones(p, refrescar=True, duracion=DURACION_PRECALENTADO)
         salida.append((p, (timezone.now() - inicio).total_seconds()))
     return salida
 
@@ -204,3 +206,103 @@ def seleccionar(lectura: Lectura, clave: str | None) -> Seleccion:
             metricas.sin_costo_facturado(m)
             sel.facturado_incompleto = True
     return sel
+
+
+# ---------------------------------------------------------------------------
+# Operaciones (block 4): Central's waiters' report data and butchery pieces.
+# A reading of its own (own cache entry), so the overview and Comercial do not
+# pay for it. Same rules as Central's reports: the waiters' comparable branches
+# (`reporte_meseros.comparables`) and the butchery section (`tablajeria`).
+# ---------------------------------------------------------------------------
+from central.motor import meseros as datos_meseros  # noqa: E402
+from central.motor import reporte_meseros, tablajeria  # noqa: E402
+from central.motor.fuentes import wansoft  # noqa: E402
+
+
+@dataclass
+class LecturaOperaciones:
+    sucursales: list[Sucursal]
+    periodo: Periodo
+    anterior: Periodo
+    anio_anterior: Periodo | None
+    meseros_actual: list
+    meseros_previo: list
+    meseros_anio: list | None
+    piezas_actual: list | None  # butchery pieces of every branch (None: could not be read)
+    piezas_anio: list | None
+    leido_en: datetime
+    origen: str
+
+
+def leer_operaciones(periodo: Periodo, refrescar: bool = False, duracion: int | None = None) -> LecturaOperaciones:
+    """Waiters' data (Central's `meseros.recolectar`) for the period, the
+    previous one and last year, and the butchery pieces of the period and last
+    year (`wansoft.piezas_tablajeria`), for every active branch; cached as `leer`."""
+    sucursales = list(Sucursal.objects.filter(activa=True).order_by("nombre"))
+    clave = "operaciones:" + _clave(periodo, sucursales, False)
+    if not refrescar:
+        guardada = cache.get(clave)
+        if guardada is not None:
+            return guardada
+    anterior, anio_ant = periodo.anterior(), periodo.mismo_periodo_anio_anterior()
+    with conexiones.abrir_wansoft() as cw:
+        ma = datos_meseros.recolectar(cw, sucursales, periodo)
+        mp = datos_meseros.recolectar(cw, sucursales, anterior)
+        my = None if anio_ant is None else (mp if anio_ant == anterior
+                                            else datos_meseros.recolectar(cw, sucursales, anio_ant))
+        ids = sorted(s.wansoft_subsidiary_id for s in sucursales if s.wansoft_subsidiary_id)
+        try:  # as Central: the butchery never breaks the page
+            pa = wansoft.piezas_tablajeria(cw, ids, periodo.desde, periodo.hasta)
+            py = wansoft.piezas_tablajeria(cw, ids, anio_ant.desde, anio_ant.hasta) if anio_ant else []
+        except Exception:
+            log.exception("Tablajería no disponible")
+            pa = py = None
+    lec = LecturaOperaciones(sucursales, periodo, anterior, anio_ant, ma, mp, my, pa, py,
+                             timezone.now(), conexiones.origen())
+    if duracion is None:
+        cache.set(clave, lec)
+    else:
+        cache.set(clave, lec, duracion)
+    return lec
+
+
+@dataclass
+class SeleccionOperaciones:
+    nombre: str
+    actual: datos_meseros.DatosMeseros
+    contra_anterior: metricas.Comparacion
+    contra_anio: metricas.Comparacion
+    tablajeria: "tablajeria.Tablajeria | None"
+    con_costo: bool = True
+
+
+def seleccionar_operaciones(lec: LecturaOperaciones, clave: str | None) -> SeleccionOperaciones:
+    """The consolidated (None) or one branch, as Central's waiters' report and
+    the commercial report's butchery section build them."""
+    if clave is None:
+        indices, nombre = list(range(len(lec.sucursales))), "Consolidado"
+    else:
+        indices = [i for i, s in enumerate(lec.sucursales) if s.clave == clave]
+        if not indices:
+            raise KeyError(clave)
+        nombre = lec.sucursales[indices[0]].nombre
+    sucs = [lec.sucursales[i] for i in indices]
+    nombres = [s.nombre for s in sucs]
+    ma = [lec.meseros_actual[i] for i in indices]
+    mp = [lec.meseros_previo[i] for i in indices]
+    my = [lec.meseros_anio[i] for i in indices] if lec.meseros_anio is not None else None
+    if clave is None:
+        actual = datos_meseros.consolidar(ma, lec.periodo, nombres)
+    else:
+        actual = ma[0]
+    con_costo = clave is None or sucs[0].considerar_costo
+    carne = None
+    if lec.piezas_actual is not None:
+        todos = {s.wansoft_subsidiary_id: s.nombre for s in lec.sucursales if s.wansoft_subsidiary_id}
+        seleccion = [s.wansoft_subsidiary_id for s in sucs if s.wansoft_subsidiary_id]
+        carne = tablajeria.construir(lec.piezas_actual, lec.piezas_anio, todos, seleccion, clave is None, con_costo)
+    return SeleccionOperaciones(
+        nombre, actual,
+        reporte_meseros.comparables(nombres, ma, mp, lec.periodo, lec.anterior),
+        reporte_meseros.comparables(nombres, ma, my, lec.periodo, lec.anio_anterior),
+        carne, con_costo)

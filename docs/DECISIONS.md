@@ -2,6 +2,15 @@
 
 Newest first. Each entry: what, why, and where it applies.
 
+## 2026-11-18 — Operaciones tab (block 4)
+
+- **Scope (owner):** salón productivity, control, table time and butchery shrinkage, all from Central's pinned engine; costo real vs teórico, "86" / devoluciones and gas / carbón / limpieza / mantenimiento as grey pending cards (no engine code yet; the expenses are in Central's unpublished scorecard work).
+- **Source:** Central's **waiters' report** (`meseros.recolectar`, `reporte_meseros.construir_tabla` and its `comparables`) for: venta por mesero por día, venta por mesero, meseros activos, mesas atendidas, propina %, tiempo de mesa, cortesías + descuentos %, cortesías, descuentos, cancelaciones; and the **butchery section** of its commercial report (`wansoft.piezas_tablajeria`, `tablajeria.construir`) for merma % (vs last year in points, and vs every branch) and its cost. Dining-room scope (waiters' report), so cortesías / descuentos differ from the commercial table's whole-branch rows (week 46 consolidated: $52,954 vs $54,253 cortesías).
+- **A reading of its own** (`lectura.leer_operaciones`, cache key "operaciones:..."), so the overview and Comercial do not pay for it; the warm-up reads it too. Week 46: 38 s.
+- **Draft thresholds adopted (owner, 2026-11-18), new rules not in Central** (constants `indicadores.UMBRALES_BORRADOR`, painted with Central's `semaforos.umbral`; the draft's yellow = orange): **venta por mesero por día** green from $14,500, orange from $11,500, red below -- one rule for every branch (the owner chose it knowing taquerías and La Esquina sell $8,700-$11,000 per waiter per day); **propina** green from 9%, orange from 8%, red below -- on Central's measure (tips of card payments / paid by card, since 2026-11-17), not "over sales" as the draft words it (week 46: every branch 9.9%-12.3%, all green).
+- **Checked:** the ten waiters' cards against Central's own `reporte_meseros.armar` (pinned code), consolidated and the 19 branches, week 46: 200 comparisons, 0 differences. Butchery: same function and inputs as Central's commercial report (Central's console does not print that section; cross-checked by code). Week 46 consolidated: venta por mesero por día $14,982 (green), propina 10.8%, tiempo de mesa 91 min, merma 17.2% (last year 18.6%), merma cost $296,216.
+- Branches without butchery in Wansoft (CentroMyJ, Puebla, Taquería Viaducto, Versalles) say so; Metepec shows its % merma but not its cost (`considerar_costo`).
+
 ## 2026-11-18 — Compact cards with tooltips; Comercial tab with charts (owner)
 
 - **Owner (2026-11-18): "necesito gráficas, y las tarjetas más pequeñas, que tengan comentarios en nube cuando te pones sobre el".** Cards now show only the name, the value with its light and the change vs last year; the target, both comparisons, the comparable branches' value, estimated / preliminary notes and the definition open in a tooltip on hover (or tap / keyboard focus: cards are focusable). A tooltip that would leave the screen opens to the left. Cost card titles shortened to "Costo total %" / "Costo facturado %".

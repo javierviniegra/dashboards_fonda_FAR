@@ -60,8 +60,11 @@
       {% endif %}
       <p><span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span>
         vs {{ anio_anterior.etiqueta|default:"año anterior" }}: {{ t.anio_texto }}{% if excluidas_anio and t.anio_anterior is not None %} (comparables este periodo: {{ t.comparable_texto }}){% endif %}.</p>
+      {% if t.indicador.origen_fila != "tablajeria" %}
       <p><span class="var var-{{ t.var_anterior.color }}">{{ t.var_anterior_texto }}</span>
         vs {{ anterior.etiqueta }}: {{ t.anterior_texto }}.</p>
+      {% endif %}
+      {% for linea in t.extra %}<p>{{ linea }}</p>{% endfor %}
       {% if t.estimado %}<p>Estimado: Odoo todavía no termina de facturar la venta de esos días.</p>{% endif %}
       {% if t.preliminar %}<p>Preliminar: las facturas del periodo se siguen capturando.</p>{% endif %}
       <p class="nube-def">{{ t.indicador.definicion }}</p>
