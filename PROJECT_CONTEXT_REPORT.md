@@ -2,7 +2,7 @@
 
 Master continuity document. Regenerated **in full** (never as patches) at every chat handoff. **Read this first when picking the project up in a fresh chat**, then `README.md` and `docs/DECISIONS.md`.
 
-Last generated: 2026-11-18 (block 0). Repo: `dashboards_fonda_FAR` (local git only; GitHub repo not created yet). No commits yet: block 0 awaits the owner's approval.
+Last generated: 2026-11-18 (block 1). Repo: `dashboards_fonda_FAR` (local git only; GitHub repo not created yet). Block 0 committed (`1a1d456`); block 1 done in dev, awaiting approval.
 
 ---
 
@@ -57,7 +57,9 @@ Known engine facts for block 1: the engine expects branch objects with `nombre`,
 
 # 5. Current state
 
-Block 0 done in dev, not committed: Django project `config`, app `dashboards` (tabs `PESTANAS`: portada, ranking, comercial, operaciones — empty "En construcción"), login (Central's look), admin branding, `/ayuda/`, brand CSS `static/dashboards/css/tablero.css`, 11 smoke tests passing (engine importable from the submodule, our `config` wins, `conexiones.origen()` reads our settings, views, login). No superuser yet: the owner creates it with `createsuperuser`.
+**Block 1 (dev, not committed):** `Sucursal` model + `cargar_sucursales` (reads Central's list with `ast`; 19 branches loaded locally), `lectura.py` (closed weeks/months only, one cached read of all branches × 3 periods, selection with `metricas.comparables`), `indicadores.py` (catalog; first card gross sales with VAT from `tabla_comercial`), Dirección General tab with branch/period selectors, "Leído a las…" + "Actualizar ahora", notice when sources are down, help per indicator, `docs/INDICATORS.md`. 26 tests. Week 46 consolidated and Acoxpa identical to Central's `probar_reporte`. A fresh read takes ~93 s (cache 0.02 s).
+
+**Block 0 (committed 1a1d456):** Django project `config`, app `dashboards` (tabs `PESTANAS`: portada, ranking, comercial, operaciones — empty "En construcción"), login (Central's look), admin branding, `/ayuda/`, brand CSS `static/dashboards/css/tablero.css`, 11 smoke tests passing (engine importable from the submodule, our `config` wins, `conexiones.origen()` reads our settings, views, login). No superuser yet: the owner creates it with `createsuperuser`.
 
 ---
 
@@ -73,9 +75,8 @@ Block 0 done in dev, not committed: Django project `config`, app `dashboards` (t
 
 # 7. Next steps
 
-1. Owner approves block 0 → first commit (decide whether `docs/reference/` goes into the private repo).
-2. Block 1: `Sucursal` model + loader, period picker (week/month), cache layer, indicator catalog contract (`docs/INDICATORS.md`), first indicator (gross sales with VAT vs last year) cross-checked against Central's commercial report.
-3. Then blocks: Dirección General overview, Comercial, Operaciones, Ranking.
+1. Owner reviews block 1 → commit. Open decisions: traffic light on sales (scorecard last year +5%, or none); warm the cache on a schedule because of the 93 s first read; `docs/reference/` in the repo or not.
+2. Then blocks: Dirección General overview, Comercial, Operaciones, Ranking.
 
 ---
 

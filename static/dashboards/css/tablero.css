@@ -62,3 +62,22 @@ h2 { color: var(--verde-oscuro); font-size: 18px; margin: 24px 0 8px; }
   .pestanas { padding: 0 8px; }
   .card { padding: 18px 16px; }
 }
+
+/* Filters and KPI cards (block 1). */
+.filtros { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; padding: 16px 20px; }
+.filtros label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--tenue); text-transform: uppercase; letter-spacing: .04em; }
+.filtros select { font-size: 14px; padding: 7px 10px; border: 1px solid #ccc; border-radius: 8px; background: #fff; color: var(--texto); min-width: 200px; max-width: 100%; }
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.kpi { background: #fff; border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, .08); padding: 18px 20px; border-top: 4px solid var(--verde); }
+.kpi-titulo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--tenue); }
+.kpi-valor { font-size: 28px; font-weight: 800; color: var(--verde-oscuro); margin: 6px 0 8px; font-variant-numeric: tabular-nums; }
+.kpi-comp { font-size: 13px; color: var(--texto); margin-top: 4px; }
+.kpi-comp.secundaria { color: var(--tenue); }
+.kpi-nota { font-size: 12px; color: #7a5a00; background: #fff6dc; border-radius: 8px; padding: 6px 8px; margin: 6px 0; line-height: 1.4; }
+.var { font-weight: 700; font-variant-numeric: tabular-nums; }
+.var-verde { color: #1e7d3a; }
+.var-rojo { color: #b3261e; }
+.var-gris { color: var(--tenue); }
+.leido { margin-top: 12px; }
+.aviso { border-left: 4px solid var(--naranja); }
+@media (max-width: 600px) { .filtros select { min-width: 0; width: 100%; } .filtros label { width: 100%; } }

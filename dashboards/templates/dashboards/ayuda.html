@@ -25,10 +25,37 @@
     cada página muestra la versión del motor de cálculo con la que se obtuvieron.
   </p>
 
-  <h2>Estado</h2>
+  <h2>Sucursal y periodo</h2>
   <p class="muted">
-    Versión inicial: las pestañas existen pero todavía no tienen indicadores. Esta ayuda se amplía con
-    cada indicador que se agregue (definición, fuente y regla de semáforo).
+    Arriba de cada pestaña eliges la sucursal (o el consolidado de todas) y el periodo: una de las
+    últimas 12 semanas cerradas (lunes a domingo) o uno de los últimos 12 meses cerrados. Los periodos
+    en curso no se ofrecen todavía, porque sus comparaciones no serían fiables.
   </p>
+
+  <h2>Qué tan frescos están los datos</h2>
+  <p class="muted">
+    Los números se leen de las fuentes al abrir la pantalla y se guardan una hora. Debajo de las
+    tarjetas dice a qué hora se leyeron. «Actualizar ahora» los vuelve a leer al momento; puede tardar
+    hasta dos minutos.
+  </p>
+
+  <h2>Cómo leer una comparación</h2>
+  <ul class="muted">
+    <li><strong>▲ / ▼</strong>: sube o baja más de 1%. Verde si es bueno, rojo si es malo.</li>
+    <li><strong>=</strong>: cambia 1% o menos.</li>
+    <li><strong>s/c</strong>: sin dato para comparar. <strong>s/cf</strong>: sin comparativo fiable (algún periodo tiene datos en menos de 90% de sus días).</li>
+    <li>En el consolidado, una sucursal sin el periodo de comparación completo (por ejemplo, abierta
+      después) queda fuera de los dos lados de esa comparación; la tarjeta dice cuáles quedaron fuera.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Indicadores</h2>
+  {% for i in catalogo %}
+    <h3>{{ i.etiqueta }}</h3>
+    <p class="muted"><strong>Qué es:</strong> {{ i.definicion }}</p>
+    <p class="muted"><strong>Fuente:</strong> {{ i.fuente }}</p>
+    <p class="muted"><strong>Comparación:</strong> {{ i.regla }}</p>
+  {% endfor %}
 </div>
 {% endblock %}

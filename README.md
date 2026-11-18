@@ -9,8 +9,8 @@ Web "super dashboard" for the Dirección General of Grupo Fonda Argentina (Djang
 
 | Block | What | State |
 |---|---|---|
-| 0 | Skeleton: Django project, login, brand template, four tabs (Dirección General, Ranking, Comercial, Operaciones), help page, Central's engine as a pinned submodule, smoke tests | **Done in dev** (not committed until the owner approves) |
-| 1 | One indicator end to end (gross sales with VAT vs last year): branch catalog, period picker (week / month), 1-hour cache, checked against Central's commercial report | Next |
+| 0 | Skeleton: Django project, login, brand template, four tabs (Dirección General, Ranking, Comercial, Operaciones), help page, Central's engine as a pinned submodule, smoke tests | **Done** (commit 1a1d456) |
+| 1 | One indicator end to end (gross sales with VAT vs last year): branch catalog from Central's list, closed week / month picker, 1-hour cached reading of every branch, card on the Dirección General tab, help per indicator; cross-checked to the cent against Central's commercial report | **Done in dev** (awaiting the owner's approval) |
 | 2-5 | Dirección General overview, Comercial (block 3), Operaciones (block 4), Ranking (block 2) | Pending |
 
 ## How the numbers are computed
@@ -27,10 +27,10 @@ Data is read **live, read-only** (Wansoft MySQL, Presupuestos AP, Odoo) and **ca
 ## Structure
 
 - `config/` — Django project (env-driven settings, urls, wsgi). `config/.env` (gitignored) holds every secret; `config/.env.example` documents every variable with blank placeholders.
-- `dashboards/` — the app: tabs (`views.PESTANAS`), the engine bridge (`motor_central.py`), the footer's engine version (`context_processors.py`), templates, tests.
+- `dashboards/` — the app: tabs (`views.PESTANAS`), the engine bridge (`motor_central.py`), the footer's engine version (`context_processors.py`), `models.Sucursal` (engine-facing branch fields; `manage.py cargar_sucursales` loads them from Central's own list), `lectura.py` (closed periods; one cached read of every branch through Central's `metricas.recolectar`; consolidated / single-branch selection with Central's comparable-branches rule), `indicadores.py` (indicator catalog: definition, source, rule, and the Central function behind each card), templates, tests.
 - `templates/` — base page, login, admin branding. `static/dashboards/` — logo, CSS (brand green `#035953`, dark green `#023f3b`, orange `#eb6834`, cream `#f0e9d8`).
 - `vendor/central/` — Central de Reportes (submodule, read-only).
-- `docs/` — `DECISIONS.md` (newest first); `docs/reference/` (owner's draft and indicator list, local only, gitignored).
+- `docs/` — `DECISIONS.md` (newest first), `INDICATORS.md` (catalog with the engine code and cross-checks of each indicator); `docs/reference/` (owner's draft and indicator list, local only, gitignored).
 
 ## Local setup (dev)
 
@@ -42,6 +42,7 @@ copy config\.env.example config\.env              # then fill it in
 "C:\xampp\mysql\bin\mysql.exe" -u root -e "CREATE DATABASE dashboards_fonda_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 .venv\Scripts\python.exe manage.py migrate
 .venv\Scripts\python.exe manage.py createcachetable
+.venv\Scripts\python.exe manage.py cargar_sucursales
 .venv\Scripts\python.exe manage.py createsuperuser
 .venv\Scripts\python.exe manage.py runserver 8045
 ```

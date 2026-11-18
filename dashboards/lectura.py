@@ -1,0 +1,135 @@
+"""Reading the sources through Central's engine, with a one-hour cache.
+
+One read = Central's `metricas.recolectar` for ALL active branches over three
+periods (the chosen one, the previous one, the same one last year): the
+engine batches every branch into one query per period, so the consolidated
+and every single branch are served from the same read. The result (Central's
+own `Metricas` objects) is cached one hour (owner, 2026-11-17), keyed by the
+period, the branch list and the engine's commit -- moving the submodule never
+serves numbers computed by older code.
+
+Selections are cut from the read with Central's comparable-branches rule
+(`metricas.comparables`), exactly as Central's commercial report does for a
+consolidated or a single branch.
+"""
+
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+
+from django.core.cache import cache
+from django.utils import timezone
+
+from central.motor import metricas
+from central.motor.fuentes import conexiones
+from central.motor.periodo import Periodo, TipoPeriodo
+
+from . import motor_central
+from .models import Sucursal
+
+# v1 periods (owner, 2026-11-17): week and month, closed ones only -- an open
+# period counts days not yet lived as expected and would always read "s/cf".
+TIPOS = (TipoPeriodo.SEMANA, TipoPeriodo.MES)
+PERIODOS_A_ELEGIR = 12
+
+
+def periodos_cerrados(tipo: TipoPeriodo, hoy: date | None = None, n: int = PERIODOS_A_ELEGIR) -> list[Periodo]:
+    """The last `n` periods of `tipo` that ended before `hoy`, newest first."""
+    hoy = hoy or timezone.localdate()
+    p = Periodo.de_fecha(tipo, hoy)
+    if p.hasta >= hoy:
+        p = p.anterior()
+    salida = []
+    while len(salida) < n:
+        salida.append(p)
+        p = p.anterior()
+    return salida
+
+
+def periodo_de(tipo: str, desde: str, hoy: date | None = None) -> Periodo:
+    """The closed period of `tipo` starting `desde` (ISO date); ValueError
+    when it is not one the screen offers."""
+    t = TipoPeriodo(tipo)
+    if t not in TIPOS:
+        raise ValueError(tipo)
+    d = date.fromisoformat(desde)
+    for p in periodos_cerrados(t, hoy):
+        if p.desde == d:
+            return p
+    raise ValueError(desde)
+
+
+@dataclass
+class Lectura:
+    """Central's metrics of every branch (same order as `sucursales`) for the
+    period, the previous period and the same period last year (None when it
+    does not exist), and when they were read."""
+
+    sucursales: list[Sucursal]
+    periodo: Periodo
+    anterior: Periodo
+    anio_anterior: Periodo | None
+    actual: list
+    previo: list
+    anio: list | None
+    leido_en: datetime
+    origen: str  # "prod" / "dev": which sources were read
+
+
+def _clave(periodo: Periodo, sucursales: list[Sucursal], costos: bool) -> str:
+    ids = ",".join(str(s.pk) for s in sucursales)
+    return (f"lectura:{motor_central.version()}:{periodo.tipo.value}:{periodo.desde}:{periodo.hasta}"
+            f":{int(costos)}:{ids}")
+
+
+def leer(periodo: Periodo, costos: bool = False, refrescar: bool = False) -> Lectura:
+    """Every active branch's metrics for `periodo` and its comparisons, from
+    the cache when read in the last hour (unless `refrescar`)."""
+    sucursales = list(Sucursal.objects.filter(activa=True).order_by("nombre"))
+    clave = _clave(periodo, sucursales, costos)
+    if not refrescar:
+        guardada = cache.get(clave)
+        if guardada is not None:
+            return guardada
+    anterior = periodo.anterior()
+    anio_ant = periodo.mismo_periodo_anio_anterior()
+    with conexiones.abrir_wansoft() as cw, conexiones.abrir_presupuestos() as cp:
+        def una(p):
+            return metricas.recolectar(cw, cp, sucursales, p, incluir_costos=costos)
+        actual, previo = una(periodo), una(anterior)
+        anio = None if anio_ant is None else (previo if anio_ant == anterior else una(anio_ant))
+    lectura = Lectura(sucursales, periodo, anterior, anio_ant, actual, previo, anio,
+                      timezone.now(), conexiones.origen())
+    cache.set(clave, lectura)
+    return lectura
+
+
+@dataclass
+class Seleccion:
+    """A selection (consolidated or one branch) cut from a reading, as
+    Central's commercial report builds it."""
+
+    nombre: str
+    actual: metricas.Metricas
+    contra_anterior: metricas.Comparacion
+    contra_anio: metricas.Comparacion
+
+
+def seleccionar(lectura: Lectura, clave: str | None) -> Seleccion:
+    """`clave` = a branch key, or None for the consolidated of every active branch."""
+    if clave is None:
+        indices, nombre = list(range(len(lectura.sucursales))), "Consolidado"
+    else:
+        indices = [i for i, s in enumerate(lectura.sucursales) if s.clave == clave]
+        if not indices:
+            raise KeyError(clave)
+        nombre = lectura.sucursales[indices[0]].nombre
+    nombres = [lectura.sucursales[i].nombre for i in indices]
+    act = [lectura.actual[i] for i in indices]
+    prev = [lectura.previo[i] for i in indices]
+    anio = [lectura.anio[i] for i in indices] if lectura.anio is not None else None
+    return Seleccion(
+        nombre,
+        metricas.consolidar(act, lectura.periodo),
+        metricas.comparables(nombres, act, prev, lectura.periodo, lectura.anterior),
+        metricas.comparables(nombres, act, anio, lectura.periodo, lectura.anio_anterior),
+    )
