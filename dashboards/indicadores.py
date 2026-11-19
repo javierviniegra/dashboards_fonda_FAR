@@ -17,7 +17,7 @@ from decimal import Decimal
 from central.motor import formato, reporte_meseros, scorecard, semaforos, tabla_comercial
 from central.motor.comparativos import Variacion, kpi_costo, variacion
 
-from .lectura import Seleccion, SeleccionOperaciones
+from .lectura import Seleccion, SeleccionCedis, SeleccionOperaciones
 
 LISTO, PENDIENTE, SIN_FUENTE = "listo", "pendiente", "sin_fuente"
 # Kinds of light, each with its rule written from Central's constants.
@@ -32,7 +32,7 @@ UMBRALES_BORRADOR = {
     "propina": (Decimal("0.09"), Decimal("0.08")),              # >= 9% green; >= 8% orange
 }
 # Where a card's row comes from.
-FILA_COMERCIAL, FILA_MESEROS, FILA_TABLAJERIA = "comercial", "meseros", "tablajeria"
+FILA_COMERCIAL, FILA_MESEROS, FILA_TABLAJERIA, FILA_CEDIS = "comercial", "meseros", "tablajeria", "cedis"
 
 
 def _pct(x: Decimal) -> str:
@@ -220,6 +220,46 @@ CATALOGO = [
               estado=PENDIENTE,
               pendiente="Está en el trabajo del scorecard de Central, que todavía no se sube a GitHub; se "
                         "muestra al mover el submódulo."),
+    # --- CEDIS (block 5, owner 2026-11-18/19): Central's CEDIS reading, fill rate, input inflation ---
+    Indicador("fill_rate", "Fill rate CEDIS", ("cedis",),
+              "Lo entregado sobre lo que pidió la sucursal, producto por producto en el periodo (tope 100%), "
+              "promedio simple de los productos. Lo que el CEDIS recortó después de confirmar no baja lo pedido; "
+              "lo que el CEDIS agregó no cuenta. Cálculo de Central (fill_rate).",
+              "Odoo (pedidos a El Bodegón y Las Empanadas y sus entregas).",
+              "Del periodo, sin comparación todavía.", "fill_total", origen_fila=FILA_CEDIS),
+    Indicador("fill_bodegon", "Fill rate El Bodegón", ("cedis",),
+              "Fill rate de los pedidos a El Bodegón de Fito.", "Odoo.", "", "fill_bodegon", origen_fila=FILA_CEDIS),
+    Indicador("fill_empanadas", "Fill rate Empanadas", ("cedis",),
+              "Fill rate de los pedidos a Las Empanadas de María Eva.", "Odoo.", "", "fill_empanadas",
+              origen_fila=FILA_CEDIS),
+    Indicador("pedidos_cedis", "Pedidos al CEDIS", ("cedis",),
+              "Pedidos confirmados del periodo a los dos proveedores internos (cada sucursal desde su inicio en "
+              "Odoo).", "Odoo.", "", "pedidos", origen_fila=FILA_CEDIS),
+    Indicador("pct_modificados", "Pedidos modificados %", ("cedis",),
+              "Pedidos con algún cambio después de confirmarse (cantidad, línea extra o monto), como el libro de "
+              "modificaciones de Central.", "Odoo (historial de los pedidos).", "", "pct_modificados",
+              origen_fila=FILA_CEDIS),
+    Indicador("modif_por_cedis", "Modificados por el CEDIS", ("cedis",),
+              "Pedidos que cambió el CEDIS después de confirmar (quién hizo cada cambio sale del historial de Odoo).",
+              "Odoo.", "", "por_cedis", origen_fila=FILA_CEDIS),
+    Indicador("diferencia_cedis", "Diferencia de los modificados", ("cedis",),
+              "Monto final menos monto al confirmar de los pedidos modificados (sin IVA).", "Odoo.", "",
+              "diferencia", origen_fila=FILA_CEDIS),
+    Indicador("inflacion_top20", "Inflación top 20 insumos", ("cedis",),
+              "Índice Laspeyres del precio de compra de los 20 insumos con más gasto en los 12 meses anteriores, "
+              "contra el mismo periodo del año anterior. Cálculo de Central (inflacion_insumos).",
+              "Compras unificadas Wansoft/Odoo; INPC de Banxico (base de Central).",
+              "Contra el mismo periodo del año anterior.", "inflacion", origen_fila=FILA_CEDIS),
+    Indicador("exactitud_inventario", "Exactitud de inventario CEDIS", ("cedis",),
+              "Cuadre del inventario físico contra el de Odoo en el CEDIS.", "Por definir.", "", estado=PENDIENTE,
+              pendiente="Falta definir la fuente (ajustes de inventario o conteos en Odoo) y su cálculo en Central."),
+    Indicador("rechazos_calidad", "Rechazos de calidad", ("cedis",),
+              "Entregas devueltas por las sucursales por mal estado o especificación.", "Sin fuente sistematizada.",
+              "", estado=SIN_FUENTE, pendiente="Sin fuente sistematizada: hoy no se registra en un sistema."),
+    Indicador("cuatro_candados", "Compras con los 4 candados", ("cedis",),
+              "Compras con 3 cotizaciones, separación en Odoo, declaración de conflicto y visto bueno técnico.",
+              "Sin fuente sistematizada.", "", estado=SIN_FUENTE,
+              pendiente="Sin fuente sistematizada: los candados no se registran en un sistema."),
     Indicador("ebitda", "EBITDA", ("portada",),
               "Utilidad antes de intereses, impuestos, depreciación y amortización.",
               "Contabilidad de Odoo (por construir).", "",
@@ -253,6 +293,7 @@ class Tarjeta:
     preliminar: bool = False  # invoiced cost still being captured
     aviso: str = ""  # why a ready card shows no value (e.g. cost not considered)
     extra: tuple[str, ...] = ()  # more tooltip lines (e.g. the butchery vs every branch)
+    linea: str = ""  # the line under the value when the card has no comparison (CEDIS)
 
     @property
     def mostrar(self) -> bool:
@@ -391,4 +432,65 @@ def tarjetas_operaciones(sel: SeleccionOperaciones) -> list[Tarjeta]:
                 salida.append(Tarjeta(ind, t.actual.costo_merma, anio,
                                       variacion(t.actual.costo_merma, anio, mejor_si_sube=False),
                                       None, variacion(None, None), formato=tabla_comercial.MONEDA))
+    return salida
+
+
+def _pct_txt(v) -> str:
+    return formato.valor(v, tabla_comercial.PORCENTAJE)
+
+
+def tarjetas_cedis(sel: SeleccionCedis) -> list[Tarjeta]:
+    """The cards of the CEDIS tab, from Central's fill rate, CEDIS summary and
+    top-20 input inflation (one period, no comparison yet)."""
+    from central.motor import fill_rate, reporte_cedis
+    P, M, E = tabla_comercial.PORCENTAJE, tabla_comercial.MONEDA, tabla_comercial.ENTERO
+    f, t, infl = sel.fill, sel.total, sel.inflacion
+    prov = {x.grupo: x for x in f.por_proveedor}
+    salida = []
+    for ind in CATALOGO:
+        if "cedis" not in ind.pestanas:
+            continue
+        k = ind.fila_comercial
+        if ind.estado != LISTO:
+            salida.append(Tarjeta(ind))
+        elif k in ("fill_total", "fill_bodegon", "fill_empanadas"):
+            x = f.total if k == "fill_total" else prov.get(
+                reporte_cedis.BODEGON if k == "fill_bodegon" else reporte_cedis.EMPANADAS)
+            if x is None or x.fill is None:
+                salida.append(Tarjeta(ind, aviso="Sin pedidos a este proveedor en el periodo."))
+                continue
+            extra = []
+            if k == "fill_total":
+                extra = [f"{p.grupo.title()}: {_pct_txt(p.fill)}" for p in f.por_proveedor if p.fill is not None]
+                if f.sin_entrega:
+                    extra.append(f"{f.sin_entrega} pedido(s) sin entrega registrada todavía (pueden ir en camino).")
+                extra.append(f"Semáforo (borrador, en Central): verde desde {_pct(fill_rate.FILL_VERDE)}, "
+                             f"naranja desde {_pct(fill_rate.FILL_NARANJA)}.")
+            salida.append(Tarjeta(ind, x.fill, formato=P, semaforo=x.estado, extra=tuple(extra),
+                                  linea=f"{x.completos} de {x.productos} productos completos"))
+        elif k == "pedidos":
+            salida.append(Tarjeta(ind, Decimal(t["ordenes"]), formato=E,
+                                  linea=f"{f.sin_entrega} sin entrega registrada"))
+        elif k == "pct_modificados":
+            salida.append(Tarjeta(ind, t["pct"], formato=P, linea=f"{t['modificadas']} de {t['ordenes']} pedidos",
+                                  extra=(f"Con cambio de cantidad: {t['con_cantidad']}; con línea extra: "
+                                         f"{t['con_extras']}; con cambio de monto: {t['con_monto']}.",)))
+        elif k == "por_cedis":
+            salida.append(Tarjeta(ind, Decimal(t["por_cedis"]), formato=E,
+                                  linea=f"por la sucursal: {t['por_sucursal']}"))
+        elif k == "diferencia":
+            salida.append(Tarjeta(ind, t["diferencia"], formato=M, linea="final vs al confirmar"))
+        elif k == "inflacion":
+            if infl is None or infl.inflacion is None:
+                salida.append(Tarjeta(ind, aviso="Sin insumos comparables contra el año anterior (o no se "
+                                                 "pudieron leer las compras)."))
+                continue
+            inpc = (f"INPC {infl.inpc_mes:%m/%Y}: {_pct_txt(infl.inpc)}" if infl.inpc is not None
+                    else "sin INPC publicado")
+            extra = [f"Semáforo (Central): verde hasta el INPC anual, naranja hasta INPC + 2 pp, rojo arriba."]
+            if infl.sin_comparar:
+                extra.append("Sin comparar (no se compraron en uno de los periodos): " + ", ".join(infl.sin_comparar[:6])
+                             + ("…" if len(infl.sin_comparar) > 6 else "") + ".")
+            salida.append(Tarjeta(ind, infl.inflacion, formato=P, semaforo=infl.estado, linea=inpc,
+                                  extra=tuple(extra)))
     return salida

@@ -149,6 +149,7 @@ def precalentar(hoy: date | None = None) -> list[tuple[Periodo, float]]:
         leer(p, refrescar=True, duracion=DURACION_PRECALENTADO)
         # Operaciones' own reading (defined below; resolved at call time).
         leer_operaciones(p, refrescar=True, duracion=DURACION_PRECALENTADO)
+        leer_cedis(p, refrescar=True, duracion=DURACION_PRECALENTADO)
         salida.append((p, (timezone.now() - inicio).total_seconds()))
     return salida
 
@@ -306,3 +307,100 @@ def seleccionar_operaciones(lec: LecturaOperaciones, clave: str | None) -> Selec
         reporte_meseros.comparables(nombres, ma, mp, lec.periodo, lec.anterior),
         reporte_meseros.comparables(nombres, ma, my, lec.periodo, lec.anio_anterior),
         carne, con_costo)
+
+
+# ---------------------------------------------------------------------------
+# CEDIS (block 5): Central's CEDIS reading (Odoo, provider side), its fill
+# rate and the top-20 input inflation. The customer -> branch mapping and the
+# INPC are read (read-only) from Central's own database (owner, 2026-11-18),
+# with the queries Central's engine publishes for that.
+# ---------------------------------------------------------------------------
+from dataclasses import replace as _replace  # noqa: E402
+
+from central.motor import fill_rate, inflacion_insumos, reporte_cedis  # noqa: E402
+
+
+def _de_central() -> tuple[list, set[str], dict]:
+    """(mapping rows, active branch keys, {month: INPC}) from Central's DB."""
+    with conexiones._abrir("CENTRAL_DB") as cur:  # Central's read-only session (120 s cap)
+        cur.execute(reporte_cedis.CONSULTA_CLIENTES)
+        cols = [c[0] for c in cur.description]
+        clientes = [reporte_cedis.fila_cliente(dict(zip(cols, fila))) for fila in cur.fetchall()]
+        cur.execute(reporte_cedis.CONSULTA_ACTIVAS)
+        activas = {fila[0] for fila in cur.fetchall()}
+        cur.execute("SELECT mes, inpc FROM central_inflacion")
+        inpc = {mes: valor for mes, valor in cur.fetchall()}
+    return clientes, activas, inpc
+
+
+@dataclass
+class LecturaCedis:
+    sucursales: list[Sucursal]
+    periodo: Periodo
+    datos: "reporte_cedis.DatosCedis"
+    inpc: dict
+    leido_en: datetime
+    origen: str
+
+
+def leer_cedis(periodo: Periodo, refrescar: bool = False, duracion: int | None = None) -> LecturaCedis:
+    """Every order of the period to El Bodegón / Las Empanadas for every active
+    branch (Central's `reporte_cedis.leer`), cached as `leer`."""
+    sucursales = list(Sucursal.objects.filter(activa=True).order_by("nombre"))
+    clave = "cedis:" + _clave(periodo, sucursales, False)
+    if not refrescar:
+        guardada = cache.get(clave)
+        if guardada is not None:
+            return guardada
+    clientes, activas, inpc = _de_central()
+    datos = reporte_cedis.leer(sucursales, periodo.desde, periodo.hasta, clientes=clientes, activas=activas)
+    lec = LecturaCedis(sucursales, periodo, datos, inpc, timezone.now(), conexiones.origen())
+    if duracion is None:
+        cache.set(clave, lec)
+    else:
+        cache.set(clave, lec, duracion)
+    return lec
+
+
+@dataclass
+class SeleccionCedis:
+    nombre: str
+    datos: "reporte_cedis.DatosCedis"  # the orders of the selection only
+    fill: "fill_rate.ResumenFill"
+    modificaciones: list[dict]  # Central's `resumen` rows (provider x branch)
+    total: dict  # Central's `total_resumen`
+    inflacion: "inflacion_insumos.InflacionInsumos | None"
+
+
+def _inflacion(lec: LecturaCedis, sucs: list[Sucursal], refrescar: bool = False):
+    """Central's top-20 input inflation of a selection, cached per selection."""
+    clave = "inflacion:" + _clave(lec.periodo, sucs, False)
+    if not refrescar:
+        guardada = cache.get(clave)
+        if guardada is not None:
+            return guardada
+    with conexiones.abrir_wansoft() as cur:
+        r = inflacion_insumos.calcular(cur, sucs, lec.periodo, lec.inpc)
+    cache.set(clave, r)
+    return r
+
+
+def seleccionar_cedis(lec: LecturaCedis, clave: str | None, refrescar: bool = False) -> SeleccionCedis:
+    """The consolidated (None: every order read, customers outside our branches
+    included, as Central's workbooks with every branch) or one branch."""
+    if clave is None:
+        nombre, sucs, datos = "Consolidado", lec.sucursales, lec.datos
+    else:
+        sucs = [s for s in lec.sucursales if s.clave == clave]
+        if not sucs:
+            raise KeyError(clave)
+        nombre = sucs[0].nombre
+        ordenes = [o for o in lec.datos.ordenes if o.sucursal == nombre]
+        datos = _replace(lec.datos, ordenes=ordenes, sucursales=[nombre] if ordenes else [])
+    filas = reporte_cedis.resumen(datos)
+    try:
+        infl = _inflacion(lec, sucs, refrescar)
+    except Exception:  # Wansoft purchases unreachable: the rest of the tab still shows
+        log.exception("Inflación de insumos no disponible")
+        infl = None
+    return SeleccionCedis(nombre, datos, fill_rate.resumen(datos), filas, reporte_cedis.total_resumen(filas), infl)

@@ -132,3 +132,14 @@ h2 { color: var(--verde-oscuro); font-size: 18px; margin: 24px 0 8px; }
 @media (max-width: 900px) { .grafica-ancha, .grafica-pastel { grid-column: span 6; } }
 .nube.nube-izq { left: auto; right: 0; }
 .nube.nube-izq::before { left: auto; right: 18px; }
+
+/* Network charts. */
+.grafica-completa { grid-column: span 6; }
+.grafica-calor .lienzo { height: 460px; }
+.grafica-burbujas .lienzo, .grafica-arbol .lienzo { height: 320px; }
+.grafica-ranking .lienzo, .grafica-mancuerna .lienzo { height: 360px; }
+@media (max-width: 900px) { .grafica-completa { grid-column: span 6; } .grafica-calor .lienzo { height: 520px; } }
+.grafica-angosta { grid-column: span 2; }
+.grafica-calor-ancha { grid-column: span 4; }
+.grafica-ranking .lienzo, .grafica-calor .lienzo { height: 460px; }
+@media (max-width: 900px) { .grafica-angosta, .grafica-calor-ancha { grid-column: span 6; } }

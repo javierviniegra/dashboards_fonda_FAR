@@ -19,11 +19,12 @@ PESTANAS = [
     ("ranking", "Ranking", "Bloque 2 · Ranking & Scorecard de sucursales"),
     ("comercial", "Comercial", "Bloque 3 · Tracción comercial"),
     ("operaciones", "Operaciones", "Bloque 4 · Salón, cocina y gastos operativos"),
+    ("cedis", "CEDIS", "Bloque 5 · El Bodegón de Fito: abasto, pedidos e insumos"),
 ]
 _POR_SLUG = {p[0]: p for p in PESTANAS}
 # Tabs that draw Central's charts under their cards (owner, 2026-11-18: charts
 # in Comercial; compact cards with the details in a hover tooltip).
-PESTANAS_CON_GRAFICAS = {"comercial"}
+PESTANAS_CON_GRAFICAS = {"portada", "comercial", "operaciones"}
 TIPOS_ETIQUETA = {TipoPeriodo.SEMANA: "Semana", TipoPeriodo.MES: "Mes"}
 
 
@@ -66,6 +67,17 @@ def tablero(request, pestana):
         })
         refrescar = request.GET.get("refrescar") == "1"
         try:
+            if slug == "cedis":  # Central's CEDIS reading (Odoo) + input inflation: a reading of its own
+                lec = lectura.leer_cedis(periodo, refrescar=refrescar)
+                sel = lectura.seleccionar_cedis(lec, sucursal, refrescar=refrescar)
+                ctx.update({
+                    "seleccion": sel,
+                    "tarjetas": indicadores.tarjetas_cedis(sel),
+                    "leido_en": timezone.localtime(lec.leido_en),
+                    "origen": lec.origen,
+                    "graficas": graficas.de_cedis(sel, sucursal is None),
+                })
+                return render(request, "dashboards/tablero.html", ctx)
             if slug == "operaciones":  # Central's waiters' report + butchery: a reading of its own
                 lec = lectura.leer_operaciones(periodo, refrescar=refrescar)
                 sel = lectura.seleccionar_operaciones(lec, sucursal)
@@ -78,6 +90,7 @@ def tablero(request, pestana):
                     "anterior": lec.anterior,
                     "excluidas_anio": sel.contra_anio.excluidas,
                     "anio_sin_base": bool(sel.contra_anio.excluidas) and sel.contra_anio.base is None,
+                    "graficas": graficas.de_operaciones(lec, sel, sucursal),
                 })
                 return render(request, "dashboards/tablero.html", ctx)
             lec = lectura.leer(periodo, refrescar=refrescar)
@@ -96,7 +109,9 @@ def tablero(request, pestana):
                                                   for i in indicadores.CATALOGO) else (),
                 "facturado_incompleto": sel.facturado_incompleto,
             })
-            if slug in PESTANAS_CON_GRAFICAS:
+            if slug == "portada":
+                ctx["graficas"] = graficas.de_portada(lec, sucursal)
+            elif slug in PESTANAS_CON_GRAFICAS:
                 ctx["graficas"] = (graficas.de_venta(lec, sel) + graficas.de_mezcla(sel)
                                    + graficas.de_composicion(sel))
         except Exception:  # sources unreachable: say so, never a 500 in the meeting

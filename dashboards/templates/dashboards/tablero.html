@@ -49,7 +49,11 @@
   <article class="kpi" tabindex="0">
     <span class="kpi-titulo">{{ t.indicador.etiqueta }}{% if t.estimado %} · est.{% endif %}{% if t.preliminar %} · prel.{% endif %}</span>
     <div class="kpi-valor">{% if t.semaforo %}<span class="luz luz-{{ t.semaforo }}" aria-label="Semáforo {{ t.semaforo }}"></span>{% endif %}{{ t.valor_texto }}</div>
+    {% if t.var_anio %}
     <div class="kpi-linea"><span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span> vs año ant.</div>
+    {% else %}
+    <div class="kpi-linea">{{ t.linea }}</div>
+    {% endif %}
     <div class="nube" role="tooltip">
       {% if t.semaforo and t.logro_texto %}
         <p><strong>{{ t.logro_texto }} de la meta</strong> ({{ t.meta_texto }}, {{ t.meta_base_texto }}).</p>
@@ -58,9 +62,11 @@
       {% elif t.indicador.luz %}
         <p>Sin semáforo: no hay dato o meta fiable para este periodo.</p>
       {% endif %}
+      {% if t.var_anio %}
       <p><span class="var var-{{ t.var_anio.color }}">{{ t.var_anio_texto }}</span>
         vs {{ anio_anterior.etiqueta|default:"año anterior" }}: {{ t.anio_texto }}{% if excluidas_anio and t.anio_anterior is not None %} (comparables este periodo: {{ t.comparable_texto }}){% endif %}.</p>
-      {% if t.indicador.origen_fila != "tablajeria" %}
+      {% elif t.linea %}<p>{{ t.linea }}.</p>{% endif %}
+      {% if t.var_anterior and t.indicador.origen_fila != "tablajeria" %}
       <p><span class="var var-{{ t.var_anterior.color }}">{{ t.var_anterior_texto }}</span>
         vs {{ anterior.etiqueta }}: {{ t.anterior_texto }}.</p>
       {% endif %}
@@ -101,7 +107,7 @@
 {% if graficas %}
 <section class="graficas">
   {% for g in graficas %}
-  <figure class="card grafica {% if g.tipo == 'pastel' %}grafica-pastel{% else %}grafica-ancha{% endif %}">
+  <figure class="card grafica grafica-{{ g.tipo }} {% if g.tipo == 'pastel' %}grafica-pastel{% elif g.tipo == 'calor' %}grafica-calor-ancha{% elif g.tipo == 'ranking' %}grafica-angosta{% else %}grafica-ancha{% endif %}">
     <figcaption>{{ g.titulo }}</figcaption>
     <div class="lienzo"><canvas id="g-{{ g.id }}" aria-label="{{ g.titulo }}"></canvas></div>
     {% if g.nota %}<p class="muted nota-grafica">{{ g.nota }}</p>{% endif %}
@@ -110,6 +116,8 @@
 </section>
 {{ graficas|json_script:"datos-graficas" }}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.1/dist/chartjs-chart-treemap.min.js"></script>
 <script src="{% static 'dashboards/js/graficas.js' %}"></script>
 {% endif %}
 

@@ -14,13 +14,14 @@ Web "super dashboard" for the Dirección General of Grupo Fonda Argentina (Djang
 | 2 | Dirección General overview: ten cards (sales, guests, check, ticket, drinks mix, both costs with Central's lights; dining-room guests and EBITDA grey as pending); cache warm-up task | **Done in dev** |
 | 3 | Comercial: compact cards with tooltips (sales, guests, check, ticket, mix, delivery share) and Central's charts (sales/guests per day, 12-month trend, channels, mix, time bands, payment methods, platforms, weekday, hour) | **Done in dev** (first version) |
 | 4 | Operaciones: waiters' productivity, tips, table time, control, butchery shrinkage (Central's waiters' report and butchery section; draft thresholds on sales per waiter per day and tips); pending grey cards for theoretical cost, 86s and operating expenses | **Done in dev** |
-| 5 | Ranking (block 2: waits for Central to publish its scorecard reading) | Pending |
+| 5 | CEDIS: fill rate (total, per provider, per branch), orders modified after confirming and by whom, top-20 input inflation vs INPC; charts; mapping and INPC read-only from Central's DB | **Done in dev** |
+| 6 | Ranking (block 2) and the dining-room guests / operating expenses cards: unblocked by the pin `5c90d49` (Central's scorecard published) | Pending |
 
 ## How the numbers are computed
 
 **No metric code lives in this repo.** Every figure comes from Central de Reportes' engine (`central.motor`), the code already tested and approved in that project:
 
-- `vendor/central` is a **git submodule** of `analisis_ejecutivos_FAR`, **pinned to one commit**. Only `central.motor` is imported, as a library; Central's Django apps are not installed here, and Central's repo is never modified from this project.
+- `vendor/central` is a **git submodule** of `analisis_ejecutivos_FAR`, **pinned to one commit** (now `5c90d49`). Only `central.motor` is imported, as a library; Central's Django apps are not installed here, and Central's repo is never modified from this project.
 - `dashboards/motor_central.py` is the single bridge to it. The engine's commit is shown in the footer of every page, so each figure traces to an exact version of the code that produced it.
 - Updating the engine is deliberate: move the submodule to another commit, run the tests, record it in `docs/DECISIONS.md`.
 - Settings append `vendor/central` to `sys.path` (never prepend: Central also has a `config` package, and ours must win; a test checks it).
@@ -32,7 +33,7 @@ Data is read **live, read-only** (Wansoft MySQL, Presupuestos AP, Odoo) and **ca
 ## Structure
 
 - `config/` — Django project (env-driven settings, urls, wsgi). `config/.env` (gitignored) holds every secret; `config/.env.example` documents every variable with blank placeholders.
-- `dashboards/` — the app: tabs (`views.PESTANAS`), the engine bridge (`motor_central.py`), the footer's engine version (`context_processors.py`), `models.Sucursal` (engine-facing branch fields; `manage.py cargar_sucursales` loads them from Central's own list), `lectura.py` (closed periods; one cached read of every branch through Central's `metricas.recolectar`, and a separate one for Operaciones -- `meseros.recolectar` and the butchery pieces; consolidated / single-branch selection with Central's comparable-branches rule), `indicadores.py` (indicator catalog: definition, source, rule, and the Central function behind each card), `graficas.py` (Central's chart data as JSON; drawn by `static/dashboards/js/graficas.js` with Chart.js 4.5.1), templates, tests.
+- `dashboards/` — the app: tabs (`views.PESTANAS`), the engine bridge (`motor_central.py`), the footer's engine version (`context_processors.py`), `models.Sucursal` (engine-facing branch fields; `manage.py cargar_sucursales` loads them from Central's own list), `lectura.py` (closed periods; one cached read of every branch through Central's `metricas.recolectar`, and a separate one for Operaciones -- `meseros.recolectar` and the butchery pieces; consolidated / single-branch selection with Central's comparable-branches rule), `indicadores.py` (indicator catalog: definition, source, rule, and the Central function behind each card), `graficas.py` (Central's chart data and per-branch figures as JSON: bars, doughnuts, bubble matrices, treemap, heatmap, diverging ranking, dumbbell; drawn by `static/dashboards/js/graficas.js` with Chart.js 4.5.1 + chartjs-chart-matrix 2.0.1 + chartjs-chart-treemap 2.3.1), templates, tests.
 - `templates/` — base page, login, admin branding. `static/dashboards/` — logo, CSS (brand green `#035953`, dark green `#023f3b`, orange `#eb6834`, cream `#f0e9d8`).
 - `vendor/central/` — Central de Reportes (submodule, read-only).
 - `docs/` — `DECISIONS.md` (newest first), `INDICATORS.md` (catalog with the engine code and cross-checks of each indicator); `docs/reference/` (owner's draft and indicator list, local only, gitignored).

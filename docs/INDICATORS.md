@@ -40,3 +40,18 @@ Charts of the Comercial tab: see `dashboards/graficas.py` (Central's `construir_
 
 Week 46 2026: the ten waiters' cards identical to Central's `reporte_meseros.armar` for the consolidated and every branch (200 comparisons).
 
+## CEDIS (block 5)
+
+| Key | Indicator | Engine code | Light | Status |
+|---|---|---|---|---|
+| `fill_rate`, `fill_bodegon`, `fill_empanadas` | Fill rate (total, per provider) | `fill_rate.resumen` over `reporte_cedis.leer` | green >= 98%, orange >= 95% (`fill_rate.estado`) | listo |
+| `pedidos_cedis` | Pedidos al CEDIS | `reporte_cedis.total_resumen` `ordenes` | — | listo |
+| `pct_modificados` | Pedidos modificados % | `total_resumen` `pct` | — | listo |
+| `modif_por_cedis` | Modificados por el CEDIS | `total_resumen` `por_cedis` / `por_sucursal` | — | listo |
+| `diferencia_cedis` | Diferencia de los modificados | `total_resumen` `diferencia` | — | listo |
+| `inflacion_top20` | Inflación top 20 insumos | `inflacion_insumos.calcular` (Laspeyres vs last year) | vs INPC: green <= INPC, orange <= INPC + 2 pp | listo |
+| `exactitud_inventario` | Exactitud de inventario CEDIS | — | — | pendiente (source to define) |
+| `rechazos_calidad`, `cuatro_candados` | Rechazos de calidad, 4 candados | — | — | sin fuente |
+
+Week 46 2026: identical to the same read inside Central (136 orders, fill 91.43%, 39 modified, -$39,005.58).
+

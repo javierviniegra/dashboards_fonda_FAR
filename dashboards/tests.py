@@ -208,7 +208,9 @@ class SeleccionTests(TestCase):
         from central.motor import reporte_meseros, tabla_comercial
         filas = {indicadores.FILA_COMERCIAL: {i.clave for i in tabla_comercial.INDICADORES},
                  indicadores.FILA_MESEROS: {i.clave for i in reporte_meseros.INDICADORES},
-                 indicadores.FILA_TABLAJERIA: {"merma_pct", "merma_costo"}}
+                 indicadores.FILA_TABLAJERIA: {"merma_pct", "merma_costo"},
+                 indicadores.FILA_CEDIS: {"fill_total", "fill_bodegon", "fill_empanadas", "pedidos",
+                                          "pct_modificados", "por_cedis", "diferencia", "inflacion"}}
         for ind in indicadores.CATALOGO:
             if ind.estado == indicadores.LISTO:
                 self.assertIn(ind.fila_comercial, filas[ind.origen_fila], ind.clave)
@@ -319,7 +321,7 @@ class PrecalentarTests(TestCase):
                          [(TipoPeriodo.SEMANA, date(2026, 11, 9)), (TipoPeriodo.MES, date(2026, 10, 1))])
 
     def test_reads_afresh_with_longer_life(self):
-        with mock.patch.object(lectura, "leer") as leer, mock.patch.object(lectura, "leer_operaciones") as ops:
+        with mock.patch.object(lectura, "leer") as leer, mock.patch.object(lectura, "leer_operaciones") as ops,              mock.patch.object(lectura, "leer_cedis"):
             lectura.precalentar(date(2026, 11, 18))
         self.assertEqual(ops.call_count, 2)
         self.assertEqual(leer.call_count, 2)
@@ -415,10 +417,11 @@ class ComercialTests(TestCase):
                                 {"tipo": "mes", "desde": hoy_mes.desde.isoformat()})
         self.assertContains(r, "Venta bruta mensual vs año anterior")
 
-    def test_overview_has_no_charts(self):
+    def test_overview_has_network_charts(self):
         with mock.patch.object(lectura, "leer", side_effect=self._lectura):
             r = self.client.get(reverse("tablero", args=["portada"]))
-        self.assertNotContains(r, 'id="datos-graficas"')
+        self.assertContains(r, 'id="datos-graficas"')
+        self.assertContains(r, "chartjs-chart-matrix")
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +444,7 @@ def _fila(valor, formato=_tc.MONEDA):
 def _dm(periodo, venta, dias=7):
     m = Mesero("Mesero 1", cuentas=Decimal(10), personas=Decimal(25), venta_bruta=Decimal(venta),
                venta_neta=Decimal(venta), dias=Decimal(dias), minutos_mesa=Decimal(900),
-               mesas_con_tiempo=Decimal(10))
+               mesas_con_tiempo=Decimal(10), propina=Decimal(venta) * Decimal("0.1"), tarjeta=Decimal(venta))
     con_datos = periodo.dias if venta else 0          # no sales = no closings that period
     return DatosMeseros(periodo=periodo, meseros={"Mesero 1": m}, dias_con_cierre=con_datos,
                         dias_con_detalle=con_datos)
@@ -536,3 +539,80 @@ class OperacionesVistaTests(TestCase):
         self.assertContains(r, "Venta por mesero por día")
         self.assertContains(r, "Merma tablajería %")
         self.assertContains(r, "Gas, carbón, limpieza y mantenimiento")
+
+
+class GraficasRedTests(TestCase):
+    """Network charts: every value is a figure of Central's rows per branch."""
+
+    def setUp(self):
+        self.p = Periodo.semana_de(date(2026, 11, 11))
+        ant, anio = self.p.anterior(), self.p.mismo_periodo_anio_anterior()
+        self.a = Sucursal(pk=1, clave="a", nombre="A", wansoft_subsidiary_id=10)
+        self.b = Sucursal(pk=2, clave="b", nombre="B", wansoft_subsidiary_id=20)
+
+        def m(per, venta, costo=None):
+            x = _m(per, venta, per.dias)
+            if costo is not None:
+                x.costo_total, x.venta_neta_con_costo_total = Decimal(costo), Decimal(venta)
+            return x
+        self.lec = lectura.Lectura([self.a, self.b], self.p, ant, anio,
+                                   [m(self.p, 1100, 400), m(self.p, 900, 350)], [m(ant, 1000), m(ant, 950)],
+                                   [m(anio, 1000), m(anio, 1000)], datetime(2026, 11, 18, tzinfo=dt_tz.utc), "prod")
+
+    def test_overview_matrix_ranking_treemap(self):
+        g = {x["id"]: x for x in graficas.de_portada(self.lec, "a")}
+        puntos = {p["etiqueta"]: p for p in g["matriz"]["puntos"]}
+        self.assertAlmostEqual(puntos["A"]["x"], 10.0)            # +10% vs last year
+        self.assertAlmostEqual(puntos["A"]["y"], 400 / 11)        # cost 400 / net 1100
+        self.assertTrue(puntos["A"]["resaltar"])
+        self.assertEqual(g["ranking"]["etiquetas"], ["A", "B"])   # sorted by growth
+        self.assertEqual(g["ranking"]["colores"], ["verde", "rojo"])
+        self.assertEqual(sum(i["valor"] for i in g["arbol"]["items"]), 2000.0)
+
+    def test_operations_charts_need_no_extra_reading(self):
+        lec = OperacionesTests()._lectura()
+        g = {x["id"]: x for x in graficas.de_operaciones(lec, lectura.seleccionar_operaciones(lec, "a"), "a")}
+        self.assertIn("productividad", g)
+        self.assertIn("merma", g)                                 # per cut, branch vs every branch
+        self.assertIn("meseros", g)                               # one branch: its waiters
+        self.assertEqual(g["productividad"]["lineas_x"], [14500.0])
+
+
+
+class CedisTests(TestCase):
+    """CEDIS cards from Central's fill rate, summary and input inflation."""
+
+    def _sel(self, fill=Decimal("0.97"), inflacion=Decimal("0.05"), inpc=Decimal("0.04")):
+        from central.motor import fill_rate, reporte_cedis
+        f = fill_rate.Fill("Total", fill, 10, 7, 5)
+        b = fill_rate.Fill(reporte_cedis.BODEGON, fill, 10, 7, 5)
+        resumen = fill_rate.ResumenFill(f, [b], [fill_rate.Fill("A", fill, 10, 7, 5)], 1)
+        total = dict(ordenes=5, modificadas=2, pct=Decimal("0.4"), con_cantidad=1, con_extras=1, con_monto=0,
+                     por_sucursal=1, por_cedis=1, diferencia=Decimal("-100"))
+        infl = SimpleNamespace(inflacion=inflacion, inpc=inpc, inpc_mes=date(2026, 9, 1), sin_comparar=[],
+                               estado=__import__("central.motor.inflacion_insumos", fromlist=["estado"]).estado(inflacion, inpc),
+                               filas=[])
+        return lectura.SeleccionCedis("Consolidado", SimpleNamespace(ordenes=[]), resumen, [], total, infl)
+
+    def _t(self, sel):
+        return {t.indicador.clave: t for t in indicadores.tarjetas_cedis(sel)}
+
+    def test_fill_rate_light_from_central(self):
+        self.assertEqual(self._t(self._sel(Decimal("0.98")))["fill_rate"].semaforo, "verde")
+        self.assertEqual(self._t(self._sel(Decimal("0.97")))["fill_rate"].semaforo, "naranja")
+        self.assertEqual(self._t(self._sel(Decimal("0.94")))["fill_rate"].semaforo, "rojo")
+
+    def test_missing_provider_says_so(self):
+        self.assertIn("Sin pedidos", self._t(self._sel())["fill_empanadas"].aviso)
+
+    def test_modifications_and_inflation(self):
+        t = self._t(self._sel())
+        self.assertEqual(t["pct_modificados"].valor, Decimal("0.4"))
+        self.assertEqual(t["pct_modificados"].linea, "2 de 5 pedidos")
+        self.assertEqual(t["inflacion_top20"].semaforo, "naranja")          # 5% vs INPC 4% (+2 pp margin)
+        self.assertIsNone(t["fill_rate"].var_anio)                          # one period, no comparison
+
+    def test_pending_cards(self):
+        t = self._t(self._sel())
+        for clave in ("exactitud_inventario", "rechazos_calidad", "cuatro_candados"):
+            self.assertFalse(t[clave].mostrar)
