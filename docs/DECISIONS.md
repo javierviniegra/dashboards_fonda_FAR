@@ -2,6 +2,14 @@
 
 Newest first. Each entry: what, why, and where it applies.
 
+## 2026-11-19 — Production deploy kit (owner: first deploy, "the steps used for Central")
+
+- **Layout:** app VM SVR-HIKCENTER `C:\Apps\DashboardsFonda`, Waitress + WhiteNoise on **8045** (8020 Presupuestos AP, 8040 Central), Apache `/dashboards_fonda/` -> `192.168.100.93:8045`, DB `dashboards_fonda` on 187.251.203.223. Kit adapted from Central de Reportes' (`deploy/update.ps1`, `deploy/windows/iniciar_servidor.ps1`, `actualizar_diario.ps1`, `registrar_tareas.ps1`) plus the submodule (`git submodule update --init --force` on every update: the pinned code must be exact) and the warm-up task.
+- **One install script** (`deploy/windows/instalar.ps1`, owner asked for a script): venv, `config\.env` (new secret key; the read-only source credentials copied from Central's production `.env` on the same VM, never printed; asks only this app's DB password), first `update.ps1`, `createsuperuser`, the three tasks (S4U).
+- **Accounts:** sources with Central's existing SELECT-only `central_reportes` (Wansoft, Presupuestos AP) and Central's Odoo account; this app's account `dashboards_fonda` owns its DB and may only SELECT `centraldereportes.central_clientecedis`, `cuentas_sucursal`, `central_inflacion` (`deploy/sql/create_dashboards_fonda_db.sql`).
+- **Daily update at 05:30** (after the 01:30 pipeline and the 02:30 warm-up, before the 07:00 one): a push to `main` reaches production the next morning. Marked FAILED on code not at `origin/main`, port down or a Python traceback; not retried.
+- **Checked locally in production mode** (Waitress, `DEBUG=false`, prefix `/dashboards_fonda`, `collectstatic`): login 200, hashed CSS/JS/logo served by WhiteNoise unprefixed (as Apache delivers them), redirects carry the prefix. All `.ps1` ASCII and parse clean. Not yet run on the VM.
+
 ## 2026-11-19 — Engine pin moved to 5c90d49; CEDIS tab (block 5)
 
 - **Pin:** `vendor/central` moved from `7181d5d` to **`5c90d49`** after Central's own session published, with the owner's approval per block: the Semáforos scorecard reading (`bc789a3`), `reporte_cedis.leer` usable outside Central's apps (`807a0bc`: the customer -> branch mapping and the active branches passed in, matched by `clave`), and fill rate + top-20 input inflation (`5c90d49`). The engine modules the dashboards already used (`metricas`, `tabla_comercial`, `meseros`, `reporte_meseros`, `tablajeria`, `composicion`, `graficas`, `comparativos`, `semaforos`) did not change; all tests pass and week 46 sales are identical (total cost and butchery moved slightly, 35.4% -> 36.0% and 17.2% -> 17.3%, from live data: Odoo invoices and late butchery captures).

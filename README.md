@@ -3,7 +3,7 @@
 Web "super dashboard" for the Dirección General of Grupo Fonda Argentina (Django). It gathers the network's and each branch's indicators on one screen for the weekly and monthly meetings, starting from the owner's draft ("Portal Directivo & Junta de Socios") and indicator list, and grows block by block.
 
 - Repo: https://github.com/javierviniegra/dashboards_fonda_FAR (private). Clone with `--recurse-submodules`; the submodule is Central de Reportes' private repo, so the cloning account needs access to both.
-- Dev: `http://127.0.0.1:8045/`. Production (later): `http://187.251.203.223:8088/dashboards_fonda/`.
+- Dev: `http://127.0.0.1:8045/`. Production: `http://187.251.203.223:8088/dashboards_fonda/` (setup and updates: `docs/PRODUCTION_SETUP.md`; kit in `deploy/`).
 
 ## Status
 
