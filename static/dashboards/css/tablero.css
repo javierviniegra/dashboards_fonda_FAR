@@ -143,3 +143,18 @@ h2 { color: var(--verde-oscuro); font-size: 18px; margin: 24px 0 8px; }
 .grafica-calor-ancha { grid-column: span 4; }
 .grafica-ranking .lienzo, .grafica-calor .lienzo { height: 460px; }
 @media (max-width: 900px) { .grafica-angosta, .grafica-calor-ancha { grid-column: span 6; } }
+
+/* Loading clock while the next page is read (owner, 2026-11-19). */
+.cargando .tarjetas, .cargando .graficas, .cargando .nota-pagina, .cargando .leido { opacity: .3; filter: grayscale(.6); pointer-events: none; transition: opacity .2s; }
+.reloj { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 50; display: flex; align-items: center; gap: 14px;
+  background: #fff; border-radius: 14px; padding: 16px 22px; box-shadow: 0 12px 40px rgba(0, 0, 0, .22); border-top: 4px solid var(--naranja); }
+.reloj[hidden] { display: none; }
+.reloj-texto { font-weight: 700; color: var(--verde-oscuro); display: flex; flex-direction: column; }
+.reloj-texto small { font-weight: 400; color: var(--tenue); font-size: 12px; margin-top: 2px; }
+.reloj-cara { position: relative; width: 34px; height: 34px; border: 3px solid var(--verde); border-radius: 50%; flex: none; }
+.reloj-cara::before, .reloj-cara::after { content: ""; position: absolute; left: 50%; bottom: 50%; width: 3px; margin-left: -1.5px;
+  background: var(--verde-oscuro); border-radius: 2px; transform-origin: 50% 100%; }
+.reloj-cara::before { height: 10px; animation: giro 6s linear infinite; }            /* hour hand */
+.reloj-cara::after { height: 13px; background: var(--naranja); animation: giro 1s linear infinite; }  /* minute hand */
+@keyframes giro { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .reloj-cara::before, .reloj-cara::after { animation-duration: 0s; } }

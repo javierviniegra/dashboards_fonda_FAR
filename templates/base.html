@@ -32,5 +32,22 @@
 <footer class="pie">
   Grupo Fonda Argentina · Cálculos: motor de Central de Reportes, versión <code>{{ version_motor }}</code>
 </footer>
+<div id="reloj" class="reloj" role="status" aria-live="polite" hidden>
+  <span class="reloj-cara" aria-hidden="true"></span>
+  <span class="reloj-texto">Leyendo datos…<small>Si el periodo no estaba leído puede tardar unos minutos.</small></span>
+</div>
+<script>
+  /* Loading clock (owner, 2026-11-19): while the next page is being read
+     (filter change, tab, "Actualizar ahora"), cards and charts dim and a
+     clock shows. The page is replaced when it arrives; going back restores it. */
+  (function () {
+    var reloj = document.getElementById("reloj");
+    function esperar() { document.body.classList.add("cargando"); reloj.hidden = false; }
+    document.querySelectorAll("form.filtros").forEach(function (f) { f.addEventListener("submit", esperar); });
+    document.querySelectorAll("form.filtros select").forEach(function (s) { s.addEventListener("change", esperar); });
+    document.querySelectorAll(".pestanas a, a.actualizar").forEach(function (a) { a.addEventListener("click", esperar); });
+    window.addEventListener("pageshow", function () { document.body.classList.remove("cargando"); reloj.hidden = true; });
+  })();
+</script>
 </body>
 </html>

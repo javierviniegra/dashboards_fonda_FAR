@@ -616,3 +616,15 @@ class CedisTests(TestCase):
         t = self._t(self._sel())
         for clave in ("exactitud_inventario", "rechazos_calidad", "cuatro_candados"):
             self.assertFalse(t[clave].mostrar)
+
+
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class RelojTests(TestCase):
+    def test_every_page_has_the_loading_clock(self):
+        self.client.force_login(User.objects.create_user("director", password="x-prueba-123"))
+        r = self.client.get(reverse("tablero", args=["ranking"]))
+        self.assertContains(r, 'id="reloj"')
+        self.assertContains(r, "Leyendo datos…")

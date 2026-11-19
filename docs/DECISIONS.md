@@ -2,6 +2,10 @@
 
 Newest first. Each entry: what, why, and where it applies.
 
+## 2026-11-19 — Loading clock while a page is read (owner)
+
+- **What:** when the branch or period filter changes, a tab is opened or "Actualizar ahora" is clicked, the cards, charts and notes dim and a small animated clock shows "Leyendo datos…" (a period not read yet can take minutes) until the next page arrives; going back restores the page (`pageshow`). Front-end only (`templates/base.html`, `.reloj` in the CSS); no figure changes. Respects reduced motion.
+
 ## 2026-11-19 — Production deploy kit (owner: first deploy, "the steps used for Central")
 
 - **Layout:** app VM SVR-HIKCENTER `C:\Apps\DashboardsFonda`, Waitress + WhiteNoise on **8045** (8020 Presupuestos AP, 8040 Central), Apache `/dashboards_fonda/` -> `192.168.100.93:8045`, DB `dashboards_fonda` on 187.251.203.223. Kit adapted from Central de Reportes' (`deploy/update.ps1`, `deploy/windows/iniciar_servidor.ps1`, `actualizar_diario.ps1`, `registrar_tareas.ps1`) plus the submodule (`git submodule update --init --force` on every update: the pinned code must be exact) and the warm-up task.

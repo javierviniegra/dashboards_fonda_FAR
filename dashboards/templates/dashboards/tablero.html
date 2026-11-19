@@ -123,8 +123,7 @@
 
 <p class="leido muted">
   Leído a las {{ leido_en|time:"H:i" }} del {{ leido_en|date:"j \d\e F"|lower }} (fuentes {{ origen }}); se vuelve a leer después de una hora.
-  <a href="?sucursal={{ sucursal_sel }}&amp;tipo={{ tipo_sel }}&amp;desde={{ desde_sel }}&amp;refrescar=1"
-     onclick="this.textContent='Leyendo… (puede tardar hasta 2 minutos)'">Actualizar ahora</a>
+  <a class="actualizar" href="?sucursal={{ sucursal_sel }}&amp;tipo={{ tipo_sel }}&amp;desde={{ desde_sel }}&amp;refrescar=1">Actualizar ahora</a>
 </p>
 {% endif %}
 
